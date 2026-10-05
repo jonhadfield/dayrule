@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/jonhadfield/dayrule/server/internal/auth"
 	"github.com/jonhadfield/dayrule/server/internal/store"
@@ -35,6 +36,10 @@ func run(ctx context.Context, args []string) error {
 	url := os.Getenv("DATABASE_URL_UNPOOLED")
 	if url == "" {
 		return errors.New("DATABASE_URL_UNPOOLED is not set")
+	}
+	if strings.Contains(url, "[SENSITIVE]") {
+		// vercel env pull writes this placeholder for Sensitive variables.
+		return errors.New("DATABASE_URL_UNPOOLED is Vercel's [SENSITIVE] placeholder, not a URL: copy the unpooled connection string from the Neon console")
 	}
 	pool, err := store.Open(ctx, url)
 	if err != nil {
