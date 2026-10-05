@@ -1,0 +1,5 @@
+version: 2
+secret:
+  # Known-answer crypto test vectors: made-up keys, not secrets.
+  ignored_paths:
+    - docs/crypto-vectors.json

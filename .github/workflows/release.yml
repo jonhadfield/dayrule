@@ -1,0 +1,56 @@
+name: Release
+
+# Publish the build hash of every production release (PLAN.md §10.7), so
+# anyone can check what dayrule.app serves against this source with
+# `pnpm --filter web verify-deploy https://dayrule.app`.
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build-hash:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Build as production does
+        working-directory: web
+        env:
+          VERCEL_ENV: production
+          VERCEL_GIT_COMMIT_SHA: ${{ github.sha }}
+        run: pnpm exec vite build
+      - name: Publish the build hash as a release
+        working-directory: web
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          hash=$(pnpm --silent build-hash)
+          short=$(git rev-parse --short HEAD)
+          {
+            echo "Build hash: \`$hash\`"
+            echo
+            echo "Commit $short. Check it against the live site from \`web/\` on this commit:"
+            echo
+            echo '```'
+            echo "pnpm install --frozen-lockfile"
+            echo "pnpm verify-deploy https://dayrule.app"
+            echo '```'
+            echo
+            echo "<details><summary>Files (SHA-256)</summary>"
+            echo
+            echo '```'
+            node build/build-hash.mjs --files | sed '$d'
+            echo '```'
+            echo "</details>"
+          } > notes.md
+          gh release create "build-$(date -u +%Y%m%d-%H%M)-$short" --target "$GITHUB_SHA" \
+            --title "Build $short" --notes-file notes.md --latest

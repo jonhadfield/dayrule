@@ -1,0 +1,9 @@
+dist
+dev-dist
+coverage
+pnpm-lock.yaml
+.vercel
+test-results
+playwright-report
+blob-report
+e2e/.out

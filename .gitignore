@@ -1,0 +1,61 @@
+# Environment and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Vercel
+.vercel/
+
+# Node / pnpm
+node_modules/
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# Web build output and caches
+web/dist/
+web/dev-dist/
+*.tsbuildinfo
+.eslintcache
+.vite/
+
+# Test output
+coverage/
+web/test-results/
+web/playwright-report/
+web/blob-report/
+web/playwright/.cache/
+web/e2e/.out/
+
+# Go
+server/bin/
+server/dayruled
+*.test
+*.out
+go.work.sum
+
+# Editors and OS
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+*.swp
+.DS_Store
+
+# Logs and temporary files
+*.log
+tmp/
+.env*
+
+# Agent skills installed by integrations
+.agents/
+skills-lock.json
+
+# Agent config: CLAUDE.md is committed only as a pointer to AGENTS.md
+!CLAUDE.md
+
+# Playwright MCP output
+.playwright-mcp/
