@@ -130,3 +130,6 @@ jobs:
           pnpm exec vite preview --port 4173 --strictPort &
           npx --yes wait-on@8 http://localhost:4173/
           CHROME_PATH=$(which google-chrome) pnpm perf
+      # A tampered crypto worker is refused in the production build.
+      - name: Crypto worker integrity
+        run: CHROME_PATH=$(which google-chrome) pnpm check:worker

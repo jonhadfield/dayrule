@@ -4,6 +4,7 @@ import { StoreProvider } from '../app/StoreProvider'
 import type { EntityStore } from '../store/store'
 import { Locked, SignedOut } from './screens'
 import { lock, resume, useAccount } from './session'
+import { message } from './validation'
 
 const AUTO_LOCK_MS = 15 * 60 * 1000 // decision 7
 
@@ -11,11 +12,13 @@ const AUTO_LOCK_MS = 15 * 60 * 1000 // decision 7
 export function Gate({ children }: { children: ReactNode }) {
   const status = useAccount((s) => s.status)
   const profile = useAccount((s) => s.profile)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    void resume()
+    resume().catch((err: unknown) => setError(message(err)))
   }, [])
 
+  if (error) return <p className="p-6">{error}</p>
   if (status === 'loading') return null
   if (status === 'signed-out') return <SignedOut />
   if (status === 'locked' || !profile) return <Locked />

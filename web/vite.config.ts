@@ -27,6 +27,29 @@ function sri(): Plugin {
     generateBundle: {
       order: 'post',
       handler(_, bundle) {
+        // The crypto worker can't carry an integrity attribute: write its
+        // hash into the bundle that starts it (src/crypto/client.ts), which
+        // is itself hashed below.
+        const placeholder = '__DAYRULE_WORKER_INTEGRITY__'
+        const worker = Object.values(bundle).filter((o) =>
+          /^assets\/worker-[^/]+\.js$/.test(o.fileName),
+        )
+        const users = Object.values(bundle).filter(
+          (o) => o.type === 'chunk' && o.code.includes(placeholder),
+        )
+        if (worker.length !== 1 || users.length !== 1)
+          throw new Error(
+            `SRI: expected one crypto worker and one chunk starting it, found ${worker.length} and ${users.length}`,
+          )
+        const [w] = worker
+        const [user] = users
+        if (user?.type === 'chunk' && w) {
+          const hash = createHash('sha384')
+            .update(w.type === 'chunk' ? w.code : w.source)
+            .digest('base64')
+          user.code = user.code.replaceAll(placeholder, hash)
+        }
+
         const page = bundle['index.html']
         if (!page || page.type !== 'asset') return
         page.source = String(page.source).replace(
