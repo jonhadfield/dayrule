@@ -1,0 +1,12 @@
+# ZAP baseline rule overrides (.github/workflows/zap.yml).
+# Format: <rule id><TAB><IGNORE|INFO|WARN|FAIL><TAB><reason>
+# IGNORE: false positive or intended. INFO: reported without failing.
+# Any alert not listed here fails the scan. Only list one with a reason
+# that holds for Dayrule.
+10096	IGNORE	False positive: the numbers are SHA-1 constants in bundled hashing code, not timestamps
+10109	IGNORE	Informational: Dayrule is a single-page app
+10015	IGNORE	Intended: index.html and the manifest revalidate on every load (max-age=0, must-revalidate)
+10049	IGNORE	Intended: hashed assets are immutable for a year; index.html is not cached
+10050	IGNORE	Intended: public static files served from the Vercel CDN cache
+10098	IGNORE	Access-Control-Allow-Origin * is Vercel default on public static files; without credentials it exposes nothing not already public
+90004	INFO	Cross-Origin-Embedder-Policy not set yet; adding it changes how the workers load and is checked on preview first
