@@ -71,6 +71,13 @@ describe('security headers', () => {
     expect(header('Permissions-Policy')).toContain('camera=()')
   })
 
+  it('isolates the page from other origins', () => {
+    // With COOP, this makes the page cross-origin isolated: no other
+    // origin's content shares its process (key material is in memory).
+    expect(header('Cross-Origin-Embedder-Policy')).toBe('require-corp')
+    expect(header('Cross-Origin-Resource-Policy')).toBe('same-origin')
+  })
+
   it('never caches the page or the service worker', () => {
     const rule = vercel.headers.find((r) => r.source.includes('sw.js'))!
     expect(rule.source).toContain('index.html')

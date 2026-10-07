@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 
@@ -27,6 +28,29 @@ function sri(): Plugin {
     generateBundle: {
       order: 'post',
       handler(_, bundle) {
+        // The crypto worker can't carry an integrity attribute: write its
+        // hash into the bundle that starts it (src/crypto/client.ts), which
+        // is itself hashed below.
+        const placeholder = '__DAYRULE_WORKER_INTEGRITY__'
+        const worker = Object.values(bundle).filter((o) =>
+          /^assets\/worker-[^/]+\.js$/.test(o.fileName),
+        )
+        const users = Object.values(bundle).filter(
+          (o) => o.type === 'chunk' && o.code.includes(placeholder),
+        )
+        if (worker.length !== 1 || users.length !== 1)
+          throw new Error(
+            `SRI: expected one crypto worker and one chunk starting it, found ${worker.length} and ${users.length}`,
+          )
+        const [w] = worker
+        const [user] = users
+        if (user?.type === 'chunk' && w) {
+          const hash = createHash('sha384')
+            .update(w.type === 'chunk' ? w.code : w.source)
+            .digest('base64')
+          user.code = user.code.replaceAll(placeholder, hash)
+        }
+
         const page = bundle['index.html']
         if (!page || page.type !== 'asset') return
         page.source = String(page.source).replace(
@@ -57,8 +81,29 @@ function sri(): Plugin {
   }
 }
 
+// `vite preview` sends production's global headers (vercel.json), so the
+// perf and worker checks in CI run under the real CSP, Trusted Types and
+// cross-origin isolation. Not in dev: the CSP would block Vite's client.
+function productionHeaders(): Record<string, string> {
+  const vercel = JSON.parse(
+    readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'),
+  ) as {
+    headers: {
+      source: string
+      has?: unknown
+      missing?: unknown
+      headers: { key: string; value: string }[]
+    }[]
+  }
+  const global = vercel.headers.find(
+    (r) => r.source === '/(.*)' && !r.has && !r.missing,
+  )
+  return Object.fromEntries(global?.headers.map((h) => [h.key, h.value]) ?? [])
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  preview: { headers: productionHeaders() },
   plugins: [
     react(),
     tailwindcss(),

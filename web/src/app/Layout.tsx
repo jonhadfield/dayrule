@@ -8,7 +8,7 @@ import { Sidebar } from '../features/sidebar/Sidebar'
 import { useGlobalKeys } from './useGlobalKeys'
 import { KeyboardPanels } from '../features/pickers/KeyboardPanels'
 import { DragLayer } from '../features/dnd/DragLayer'
-import { LazyQuickFind } from '../features/find/LazyQuickFind'
+import { QuickFindHost } from '../features/find/QuickFind'
 import { MobileEditor } from '../features/todo/MobileEditor'
 import { SelectionBar } from '../features/todo/SelectionBar'
 import { useEdgeSwipeBack } from './useEdgeSwipeBack'
@@ -110,7 +110,7 @@ export function Layout() {
           <MobileEditor />
           <SelectionBar />
           <KeyboardPanels />
-          <LazyQuickFind />
+          <QuickFindHost />
         </div>
       </DragLayer>
     )
@@ -125,7 +125,7 @@ export function Layout() {
           <Outlet />
         </main>
         <KeyboardPanels />
-        <LazyQuickFind />
+        <QuickFindHost />
         <SelectionBar />
       </div>
     </DragLayer>

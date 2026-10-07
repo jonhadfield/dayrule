@@ -43,8 +43,8 @@ export function useGlobalKeys() {
         ev.key.trim() !== ''
 
       if (ui.finding !== null) {
-        // Quick Find loads on first use: keep what's typed before its field
-        // exists. Once the field has focus, it takes the keys itself.
+        // Keep what's typed before Quick Find's field has focus. Once it
+        // has, the field takes the keys itself.
         if (!typing && printable) {
           ev.preventDefault()
           ui.find(ui.finding + ev.key)

@@ -14,6 +14,7 @@
     "preview": "vite preview",
     "e2e": "playwright test",
     "check:dist": "node build/check-dist.mjs",
+    "check:worker": "node build/check-worker-sri.mjs",
     "perf": "node build/perf.mjs",
     "build-hash": "node build/build-hash.mjs",
     "verify-deploy": "node build/verify-deploy.mjs"

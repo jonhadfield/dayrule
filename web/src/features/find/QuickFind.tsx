@@ -13,11 +13,17 @@ const ICONS: Record<FindKind, typeof Inbox> = {
   todo: FileText,
 }
 
+/** Quick Find, shown while there's a query (even an empty one). */
+export function QuickFindHost() {
+  const finding = useUI((s) => s.finding)
+  return finding === null ? null : <QuickFind />
+}
+
 /**
- * Search everything (PLAN.md §7): type anywhere, ⌘F or ⌘/. Loaded on first
- * use (see LazyQuickFind), which keeps MiniSearch out of the initial bundle.
+ * Search everything (PLAN.md §7): type anywhere, ⌘F or ⌘/. Part of the
+ * main bundle rather than loaded on demand, so SRI covers it (§10.7).
  */
-export default function QuickFind() {
+function QuickFind() {
   const e = useAllEntities()
   const today = useToday()
   const navigate = useNavigate()

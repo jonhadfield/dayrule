@@ -79,8 +79,9 @@ record types and timestamps, is inside the ciphertext.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Cross-site scripting | React escaping, no `innerHTML`; CSP `script-src 'self' 'wasm-unsafe-eval'`, no inline scripts; Trusted Types with one policy that only accepts our own same-origin worker scripts | `vercel.json`, `web/src/security/headers.test.ts`, `app/trusted.ts` |
+| Another site reading memory through side channels (Spectre-style) | Cross-origin isolation: COOP `same-origin`, COEP `require-corp`, CORP `same-origin`, so no other origin's pages or files share the page's process | `vercel.json`, `web/src/security/headers.test.ts` |
 | Third-party script compromise | No third-party scripts, fonts, analytics or CDNs; CSP allows only `'self'` | `vercel.json` |
-| Tampered static files | SRI on every script and stylesheet tag; immutable Vercel deployments; reproducible builds with a published build hash and `pnpm verify-deploy` | `web/vite.config.ts`, `web/build/`, `.github/workflows/release.yml` |
+| Tampered static files | SRI on every script and stylesheet tag; the crypto worker is fetched with an integrity check before it starts (its hash is in the SRI-checked bundle); immutable Vercel deployments; reproducible builds with a published build hash and `pnpm verify-deploy` | `web/vite.config.ts`, `web/build/`, `.github/workflows/release.yml` |
 | Clickjacking | `frame-ancestors 'none'` | `vercel.json` |
 | Vulnerable dependencies | Lockfile; `pnpm audit --prod` and `govulncheck` in CI | `.github/workflows/ci.yml` |
 
@@ -100,7 +101,10 @@ record types and timestamps, is inside the ciphertext.
   end-to-end encryption delivered over the web. Mitigations: 2FA on Vercel and
   GitHub, protected branches, immutable deployments, SRI, and reproducible
   builds that anyone can check with `pnpm verify-deploy`. The service worker
-  only switches to a new version when you choose Reload.
+  only switches to a new version when you choose Reload. SRI can't protect
+  `index.html` itself, and the crypto worker's check is a separate fetch from
+  the one that starts it, so a server that answers the two differently could
+  get past it; it stops a changed file, not a server set on deceiving you.
 - **Withholding and rollback.** The server can't read or forge records, but it
   can withhold them or serve an older version of a record. Devices that
   already have newer data keep it (merging uses per-field clocks), but a new
