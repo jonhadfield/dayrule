@@ -9,4 +9,3 @@
 10049	IGNORE	Intended: hashed assets are immutable for a year; index.html is not cached
 10050	IGNORE	Intended: public static files served from the Vercel CDN cache
 10098	IGNORE	Access-Control-Allow-Origin * is Vercel default on public static files; without credentials it exposes nothing not already public
-90004	INFO	Cross-Origin-Embedder-Policy not set yet; adding it changes how the workers load and is checked on preview first
