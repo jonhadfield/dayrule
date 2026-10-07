@@ -79,6 +79,7 @@ record types and timestamps, is inside the ciphertext.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Cross-site scripting | React escaping, no `innerHTML`; CSP `script-src 'self' 'wasm-unsafe-eval'`, no inline scripts; Trusted Types with one policy that only accepts our own same-origin worker scripts | `vercel.json`, `web/src/security/headers.test.ts`, `app/trusted.ts` |
+| Another site reading memory through side channels (Spectre-style) | Cross-origin isolation: COOP `same-origin`, COEP `require-corp`, CORP `same-origin`, so no other origin's pages or files share the page's process | `vercel.json`, `web/src/security/headers.test.ts` |
 | Third-party script compromise | No third-party scripts, fonts, analytics or CDNs; CSP allows only `'self'` | `vercel.json` |
 | Tampered static files | SRI on every script and stylesheet tag; the crypto worker is fetched with an integrity check before it starts (its hash is in the SRI-checked bundle); immutable Vercel deployments; reproducible builds with a published build hash and `pnpm verify-deploy` | `web/vite.config.ts`, `web/build/`, `.github/workflows/release.yml` |
 | Clickjacking | `frame-ancestors 'none'` | `vercel.json` |

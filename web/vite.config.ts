@@ -2,6 +2,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { createHash } from 'node:crypto'
+import { readFileSync } from 'node:fs'
 import type { Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 
@@ -80,8 +81,29 @@ function sri(): Plugin {
   }
 }
 
+// `vite preview` sends production's global headers (vercel.json), so the
+// perf and worker checks in CI run under the real CSP, Trusted Types and
+// cross-origin isolation. Not in dev: the CSP would block Vite's client.
+function productionHeaders(): Record<string, string> {
+  const vercel = JSON.parse(
+    readFileSync(new URL('../vercel.json', import.meta.url), 'utf8'),
+  ) as {
+    headers: {
+      source: string
+      has?: unknown
+      missing?: unknown
+      headers: { key: string; value: string }[]
+    }[]
+  }
+  const global = vercel.headers.find(
+    (r) => r.source === '/(.*)' && !r.has && !r.missing,
+  )
+  return Object.fromEntries(global?.headers.map((h) => [h.key, h.value]) ?? [])
+}
+
 // https://vite.dev/config/
 export default defineConfig({
+  preview: { headers: productionHeaders() },
   plugins: [
     react(),
     tailwindcss(),
