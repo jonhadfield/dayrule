@@ -21,6 +21,18 @@ export function addLocalDays(s: LocalDate, days: number): LocalDate {
   return toLocalDate(addDays(fromLocalDate(s), days))
 }
 
+/**
+ * A "HH:mm" time rounded to the nearest quarter hour, the only times
+ * reminders go off (the sender runs every 15 minutes, PLAN.md §10.5).
+ * Times after 23:52 round down to 23:45 so the day never changes.
+ */
+export function roundToQuarter(time: string): string {
+  const [h, m] = time.split(':').map(Number) as [number, number]
+  const quarters = Math.min(Math.round((h * 60 + m) / 15), 24 * 4 - 1)
+  const mins = quarters * 15
+  return `${String(Math.floor(mins / 60)).padStart(2, '0')}:${String(mins % 60).padStart(2, '0')}`
+}
+
 /** Display form: 2026/10/04. */
 export function formatDisplayDate(s: LocalDate): string {
   return format(fromLocalDate(s), 'yyyy/MM/dd')

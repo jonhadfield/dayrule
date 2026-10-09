@@ -330,9 +330,9 @@ function Scheduling() {
       </P>
       <H2>Reminders</H2>
       <P>
-        Choose <K>Reminder</K> in a to-do to be reminded at a time. Turn
-        reminders on first, in Account → Reminders, as a notification, an email
-        or both.
+        Choose <K>Reminder</K> in a to-do to be reminded at a time: on the hour,
+        or at quarter past, half past or quarter to. Turn reminders on first, in
+        Account → Reminders, as a notification, an email or both.
       </P>
     </>
   )

@@ -19,7 +19,7 @@ import (
 )
 
 // Reminders serves reminder settings, push subscriptions and the
-// per-minute sender (PLAN.md §10.5). The server stores when reminders
+// quarter-hourly sender (PLAN.md §10.5). The server stores when reminders
 // fire, never what they are for.
 type Reminders struct {
 	Accounts *Accounts
@@ -167,7 +167,7 @@ func (s *Reminders) unsubscribe(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
-// send runs every minute from a Vercel Cron Job (Bearer CRON_SECRET).
+// send runs every 15 minutes from a Vercel Cron Job (Bearer CRON_SECRET).
 func (s *Reminders) send(w http.ResponseWriter, r *http.Request) {
 	want := "Bearer " + s.CronSecret
 	if s.CronSecret == "" || subtle.ConstantTimeCompare([]byte(r.Header.Get("Authorization")), []byte(want)) != 1 {
