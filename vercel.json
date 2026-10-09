@@ -114,7 +114,7 @@
     },
     {
       "path": "/api/internal/reminders",
-      "schedule": "* * * * *"
+      "schedule": "*/15 * * * *"
     }
   ]
 }

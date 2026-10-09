@@ -3,8 +3,26 @@ import {
   addLocalDays,
   formatDisplayDate,
   parseWhen,
+  roundToQuarter,
   toLocalDate,
 } from './dates'
+
+describe('roundToQuarter', () => {
+  it.each([
+    ['09:00', '09:00'],
+    ['09:07', '09:00'],
+    ['09:08', '09:15'],
+    ['14:22', '14:15'],
+    ['14:23', '14:30'],
+    ['10:53', '11:00'],
+    ['00:05', '00:00'],
+    ['23:52', '23:45'],
+    ['23:53', '23:45'],
+    ['23:59', '23:45'],
+  ])('%s → %s', (input, out) => {
+    expect(roundToQuarter(input)).toBe(out)
+  })
+})
 
 // Sunday 4 October 2026.
 const today = new Date(2026, 9, 4)
