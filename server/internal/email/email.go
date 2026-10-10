@@ -124,6 +124,16 @@ func PasswordChanged(to string) Message {
 	return Message{To: to, Subject: "Your Dayrule password was changed", Text: "Your Dayrule password was changed and your other devices were signed out.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away.\n"}
 }
 
+func PasskeyAdded(to, label string) Message {
+	return Message{To: to, Subject: "A passkey was added to your Dayrule account", Text: fmt.Sprintf(
+		"A passkey (%q) was added to your Dayrule account. Signing in now needs your password and a passkey.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away, then remove the passkey under Account.\n", label)}
+}
+
+func PasskeyRemoved(to, label string) Message {
+	return Message{To: to, Subject: "A passkey was removed from your Dayrule account", Text: fmt.Sprintf(
+		"The passkey %q was removed from your Dayrule account.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away.\n", label)}
+}
+
 // Reminder says only that there is one, and when: the server can't know
 // what it's for (PLAN.md §10.5).
 func Reminder(to, localTime string) Message {

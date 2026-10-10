@@ -67,6 +67,7 @@ record types and timestamps, is inside the ciphertext.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Password guessing online | Per-account lockout with backoff; Vercel Firewall rate limits on auth endpoints (M7) | `httpapi/accounts.go` |
+| A phished or reused password | Optional passkey as a second step (decision 30): the server verifies the WebAuthn assertion (RP ID = the exact host, so a look-alike site can't use it) before it issues a session or the wrapped key; adding or removing one needs the password and emails a notice; the recovery phrase still counts as both factors | `httpapi/passkeys.go` |
 | Password spraying (one common password across many accounts) | New passwords are refused if they appear in Pwned Passwords; only a 5-character SHA-1 prefix leaves the browser, never through Dayrule's API; fails open | `account/breach.ts` |
 | Learning which emails have accounts | Fake salts for unknown emails; identical work and responses; sign-up always returns 202 | `httpapi/accounts.go` |
 | Session theft by script | HttpOnly cookie; no tokens in JavaScript | `httpapi/accounts.go` |

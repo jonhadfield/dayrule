@@ -28,6 +28,8 @@ type Accounts struct {
 	InviteOnly bool
 	Now        func() time.Time
 	Logger     *slog.Logger
+	// Passkeys serves passkeys as a second sign-in step; nil turns them off.
+	Passkeys *Passkeys
 }
 
 const (
@@ -56,6 +58,7 @@ func (a *Accounts) routes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /api/v1/account/sessions", a.withSession(a.listSessions))
 	mux.HandleFunc("DELETE /api/v1/account/sessions/{id}", a.withSession(a.revokeSession))
 	mux.HandleFunc("DELETE /api/v1/account", a.withSession(a.deleteAccount))
+	a.passkeyRoutes(mux)
 }
 
 // ---------------------------------------------------------------------------
@@ -490,7 +493,21 @@ func (a *Accounts) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if err := a.startSession(r.Context(), w, u.ID, req.DeviceLabel); err != nil {
+	switch passkey, err := a.needsPasskey(r, u.ID); {
+	case err != nil:
+		writeErr(w, err)
+		return
+	case passkey:
+		a.startPasskeyLogin(w, r, u.ID, req.DeviceLabel)
+		return
+	}
+	a.signedIn(w, r, u, req.DeviceLabel)
+}
+
+// signedIn starts a session and hands over what the device needs to unlock:
+// the password-wrapped account key and the key derivation parameters.
+func (a *Accounts) signedIn(w http.ResponseWriter, r *http.Request, u *store.User, deviceLabel string) {
+	if err := a.startSession(r.Context(), w, u.ID, deviceLabel); err != nil {
 		writeErr(w, err)
 		return
 	}

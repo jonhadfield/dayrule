@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -118,14 +119,37 @@ func newAccounts(pool *pgxpool.Pool, logger *slog.Logger) (*httpapi.Accounts, er
 	if key := os.Getenv("RESEND_API_KEY"); key != "" {
 		sender = email.Resend{APIKey: key, From: "Dayrule <no-reply@dayrule.app>"}
 	}
+	accounts := store.Accounts{Pool: pool}
+	passkeys, err := httpapi.NewPasskeys(store.Passkeys{Accounts: accounts}, passkeyOrigins())
+	if err != nil {
+		return nil, err
+	}
 	return &httpapi.Accounts{
-		Store:      store.Accounts{Pool: pool},
+		Store:      accounts,
 		Keys:       keys,
 		Email:      sender,
 		InviteOnly: os.Getenv("INVITE_ONLY") != "false", // decision 2: invite-only until M7
 		Now:        time.Now,
 		Logger:     logger,
+		Passkeys:   passkeys,
 	}, nil
+}
+
+// passkeyOrigins lists the origins passkeys work on (PLAN.md §14.4): the two
+// dayrule.app hosts unless PASSKEY_ORIGINS (comma-separated) says otherwise,
+// for example http://localhost:5173 in development.
+func passkeyOrigins() []string {
+	v := os.Getenv("PASSKEY_ORIGINS")
+	if v == "" {
+		return []string{"https://dayrule.app", "https://preview.dayrule.app"}
+	}
+	var out []string
+	for _, o := range strings.Split(v, ",") {
+		if o = strings.TrimSpace(o); o != "" {
+			out = append(out, o)
+		}
+	}
+	return out
 }
 
 // version identifies the running build: the short Git SHA on Vercel, "dev"
