@@ -12,6 +12,7 @@ import (
 	"sync"
 	"testing"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib"
 	"github.com/pressly/goose/v3"
@@ -22,7 +23,13 @@ import (
 
 var migrateOnce sync.Once
 
-// New returns a pool on a freshly truncated, fully migrated database.
+// lockKey is the Postgres advisory lock that serialises tests using the
+// database: go test runs packages in parallel, and each test truncates the
+// tables another package's test may be using.
+const lockKey = 0x646179 // "day"
+
+// New returns a pool on a freshly truncated, fully migrated database, held
+// for this test alone until it ends.
 func New(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	url := os.Getenv("TEST_DATABASE_URL")
@@ -30,6 +37,16 @@ func New(t *testing.T) *pgxpool.Pool {
 		t.Fatal("TEST_DATABASE_URL is not set (see internal/testdb for a local Postgres command)")
 	}
 	ctx := context.Background()
+
+	// The lock lasts as long as this connection, which closes last.
+	lock, err := pgx.Connect(ctx, url)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = lock.Close(context.Background()) })
+	if _, err := lock.Exec(ctx, `SELECT pg_advisory_lock($1)`, lockKey); err != nil {
+		t.Fatal(err)
+	}
 
 	var migrateErr error
 	migrateOnce.Do(func() {
