@@ -10,4 +10,5 @@ cd ../server
 DATABASE_URL_UNPOOLED="$E2E_DATABASE_URL" go run ./cmd/migrate up
 go build -o "$out/dayruled" ./cmd/dayruled
 go build -o "$out/invite" ./cmd/invite
+go build -o "$out/plaintext-check" ./cmd/plaintext-check
 AUTH_SECRET="$(openssl rand -hex 32)" DATABASE_URL="$E2E_DATABASE_URL" PORT=8080 exec "$out/dayruled" > "$out/api.log" 2>&1

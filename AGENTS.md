@@ -37,6 +37,9 @@ From `server/`:
 - `go run ./cmd/migrate status|up|down` — needs `DATABASE_URL_UNPOOLED`.
 - `go run ./cmd/invite [n]` — prints n single-use invite codes; needs only
   that environment's `DATABASE_URL_UNPOOLED` (invites are stored as SHA-256).
+- `go run ./cmd/plaintext-check needle…` — lists the `table.column`s where
+  any needle appears (also inside base64); used by `web/e2e/no-plaintext.e2e.ts`.
+  Needs `DATABASE_URL_UNPOOLED`.
 - Integration tests need `TEST_DATABASE_URL`. Locally:
   `docker run --rm -d --name dayrule-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=dayrule_test postgres:18`
   then `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/dayrule_test?sslmode=disable go test ./...`.
