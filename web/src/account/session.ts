@@ -9,6 +9,7 @@ import { keyring } from '../crypto/client'
 import type { Credentials, WrappedB64 } from '../crypto/keyring'
 import type { KdfParams } from '../crypto/primitives'
 import { api, deviceLabel } from './api'
+import { checkServerKdf } from './kdf'
 import { profiles, type Profile } from './profile'
 import {
   requestJSON,
@@ -158,6 +159,7 @@ export async function signIn(
     '/auth/prelogin',
     { email },
   )
+  checkServerKdf(pre.kdf)
   const authKey = await keyring().beginLogin(password, pre.salt, pre.kdf)
   const r = await api<LoginResponse | { secondStep: SecondStep }>(
     'POST',
@@ -208,6 +210,9 @@ async function finishSignIn(
   email: string,
   remember: boolean,
 ): Promise<void> {
+  // Cached on this device for offline unlock, so it gets the same check as
+  // prelogin's, whichever step signed in.
+  checkServerKdf(r.kdf)
   await keyring().finishLogin(r.userId, r.wrappedPassword)
   await finishUnlock(
     {
@@ -239,6 +244,7 @@ export async function unlock(
 ): Promise<void> {
   const profile = useAccount.getState().profile
   if (!profile) throw new Error('Not signed in on this device.')
+  checkServerKdf(profile.kdf)
   const k = keyring()
   await k.beginLogin(password, profile.salt, profile.kdf)
   try {
@@ -330,6 +336,7 @@ function currentProfile(): Profile {
 /** The AuthKey for a password, to prove it to the server. */
 export async function authKeyFor(password: string): Promise<string> {
   const p = currentProfile()
+  checkServerKdf(p.kdf)
   return keyring().beginLogin(password, p.salt, p.kdf)
 }
 
