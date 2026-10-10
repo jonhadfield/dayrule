@@ -75,6 +75,8 @@ func (hs *harness) newInvite() string {
 type client struct {
 	hs     *harness
 	cookie string
+	bearer string
+	header string // X-Dayrule-Client; default "web"
 	origin string // sent as the Origin header, as a browser does
 }
 
@@ -92,7 +94,14 @@ func (c *client) do(method, path string, body any) resp {
 		r = bytes.NewReader(b)
 	}
 	req := httptest.NewRequest(method, path, r)
-	req.Header.Set("X-Dayrule-Client", "web")
+	clientHdr := c.header
+	if clientHdr == "" {
+		clientHdr = "web"
+	}
+	req.Header.Set("X-Dayrule-Client", clientHdr)
+	if c.bearer != "" {
+		req.Header.Set("Authorization", "Bearer "+c.bearer)
+	}
 	if c.cookie != "" {
 		req.Header.Set("Cookie", sessionCookie+"="+c.cookie)
 	}
@@ -398,5 +407,58 @@ func TestSessionCookieAttributes(t *testing.T) {
 	}
 	if strings.Contains(set, "Domain=") {
 		t.Errorf("Set-Cookie must be host-only: %q", set)
+	}
+}
+
+func TestNativeBearerSession(t *testing.T) {
+	hs := newHarness(t)
+	a := hs.signUp("ios@example.com")
+	a.c.cookie = "" // drop the cookie from sign-up
+
+	ios := &client{hs: hs, header: "ios/1"}
+	r := ios.do("POST", "/api/v1/auth/login", map[string]string{
+		"email": a.email, "authKey": a.authKey, "deviceLabel": "iPhone",
+	})
+	if r.code != 200 {
+		t.Fatalf("login = %d %v", r.code, r.body)
+	}
+	token, _ := r.body["token"].(string)
+	if token == "" {
+		t.Fatalf("native login missing token: %v", r.body)
+	}
+	ios.bearer = token
+	ios.cookie = "" // use Bearer only
+	if r := ios.do("GET", "/api/v1/account", nil); r.code != 200 || r.body["email"] != "ios@example.com" {
+		t.Fatalf("bearer account = %d %v", r.code, r.body)
+	}
+	if r := ios.do("POST", "/api/v1/auth/logout", nil); r.code != 204 {
+		t.Fatalf("logout = %d", r.code)
+	}
+	if r := ios.do("GET", "/api/v1/account", nil); r.code != 401 {
+		t.Fatalf("after logout = %d, want 401", r.code)
+	}
+}
+
+func TestBrowserMarkersNeverGetBodyToken(t *testing.T) {
+	hs := newHarness(t)
+	a := hs.signUp("browser@example.com")
+	c := &client{hs: hs, header: "ios/1", origin: "https://evil.example"}
+	r := c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey})
+	if r.code != 200 {
+		t.Fatalf("login = %d", r.code)
+	}
+	if _, ok := r.body["token"]; ok {
+		t.Fatalf("Origin request must not receive a body token: %v", r.body)
+	}
+}
+
+func TestUnrecognisedClientHeaderRejected(t *testing.T) {
+	hs := newHarness(t)
+	req := httptest.NewRequest("POST", "/api/v1/auth/prelogin", strings.NewReader(`{"email":"a@example.com"}`))
+	req.Header.Set("X-Dayrule-Client", "android/1")
+	rec := httptest.NewRecorder()
+	hs.h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("unrecognised client = %d, want 403", rec.Code)
 	}
 }

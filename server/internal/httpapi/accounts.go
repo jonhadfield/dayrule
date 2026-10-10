@@ -149,20 +149,20 @@ func label(s string) string {
 	return s
 }
 
-func (a *Accounts) startSession(ctx context.Context, w http.ResponseWriter, userID uuid.UUID, deviceLabel string) error {
+func (a *Accounts) startSession(ctx context.Context, w http.ResponseWriter, userID uuid.UUID, deviceLabel string) (string, error) {
 	token, hash, err := auth.NewToken()
 	if err != nil {
-		return err
+		return "", err
 	}
 	now := a.Now()
 	if _, err := a.Store.CreateSession(ctx, userID, hash, label(deviceLabel), now, now.Add(sessionLifetime)); err != nil {
-		return err
+		return "", err
 	}
 	http.SetCookie(w, &http.Cookie{
 		Name: sessionCookie, Value: token, Path: "/", MaxAge: int(sessionLifetime.Seconds()),
 		Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
-	return nil
+	return token, nil
 }
 
 func clearSession(w http.ResponseWriter) {
@@ -170,6 +170,30 @@ func clearSession(w http.ResponseWriter) {
 		Name: sessionCookie, Value: "", Path: "/", MaxAge: -1,
 		Secure: true, HttpOnly: true, SameSite: http.SameSiteStrictMode,
 	})
+}
+
+// wantsBearerToken is true for native clients that should receive the session
+// token in the JSON body. Browser-shaped requests (Origin / Sec-Fetch-*) never
+// get a body token, so XSS in the PWA can't mint a non-HttpOnly credential.
+func wantsBearerToken(r *http.Request) bool {
+	if r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "" || r.Header.Get("Sec-Fetch-Mode") != "" {
+		return false
+	}
+	return strings.HasPrefix(r.Header.Get("X-Dayrule-Client"), "ios/")
+}
+
+// sessionCredential reads the Bearer token or the session cookie.
+func sessionCredential(r *http.Request) (string, bool) {
+	if ah := r.Header.Get("Authorization"); strings.HasPrefix(ah, "Bearer ") {
+		tok := strings.TrimSpace(strings.TrimPrefix(ah, "Bearer "))
+		if tok != "" {
+			return tok, true
+		}
+	}
+	if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
+		return c.Value, true
+	}
+	return "", false
 }
 
 type sessionKey struct{}
@@ -182,13 +206,13 @@ func sessionFrom(ctx context.Context) *store.Session {
 // withSession requires a live session and slides its expiry forward.
 func (a *Accounts) withSession(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		c, err := r.Cookie(sessionCookie)
-		if err != nil {
+		tok, ok := sessionCredential(r)
+		if !ok {
 			writeErr(w, errUnauthorized)
 			return
 		}
 		now := a.Now()
-		s, err := a.Store.SessionByToken(r.Context(), auth.TokenHash(c.Value), now)
+		s, err := a.Store.SessionByToken(r.Context(), auth.TokenHash(tok), now)
 		if err != nil {
 			if errors.Is(err, store.ErrNotFound) {
 				clearSession(w)
@@ -411,11 +435,16 @@ func (a *Accounts) register(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if err := a.startSession(r.Context(), w, userID, req.DeviceLabel); err != nil {
+	token, err := a.startSession(r.Context(), w, userID, req.DeviceLabel)
+	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusCreated, map[string]string{"userId": userID.String()})
+	resp := map[string]any{"userId": userID.String()}
+	if wantsBearerToken(r) {
+		resp["token"] = token
+	}
+	writeJSON(w, http.StatusCreated, resp)
 }
 
 // ---------------------------------------------------------------------------
@@ -518,19 +547,24 @@ func (a *Accounts) login(w http.ResponseWriter, r *http.Request) {
 // signedIn starts a session and hands over what the device needs to unlock:
 // the password-wrapped account key and the key derivation parameters.
 func (a *Accounts) signedIn(w http.ResponseWriter, r *http.Request, u *store.User, deviceLabel string) {
-	if err := a.startSession(r.Context(), w, u.ID, deviceLabel); err != nil {
+	token, err := a.startSession(r.Context(), w, u.ID, deviceLabel)
+	if err != nil {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{
+	resp := map[string]any{
 		"userId": u.ID.String(), "wrappedPassword": u.WrappedPassword,
 		"salt": base64.StdEncoding.EncodeToString(u.KdfSalt), "kdf": u.Kdf,
-	})
+	}
+	if wantsBearerToken(r) {
+		resp["token"] = token
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 func (a *Accounts) logout(w http.ResponseWriter, r *http.Request) {
-	if c, err := r.Cookie(sessionCookie); err == nil {
-		if s, err := a.Store.SessionByToken(r.Context(), auth.TokenHash(c.Value), a.Now()); err == nil {
+	if tok, ok := sessionCredential(r); ok {
+		if s, err := a.Store.SessionByToken(r.Context(), auth.TokenHash(tok), a.Now()); err == nil {
 			_, _ = a.Store.DeleteSession(r.Context(), s.UserID, s.ID)
 		}
 	}
@@ -610,12 +644,17 @@ func (a *Accounts) recoverComplete(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if err := a.startSession(r.Context(), w, u.ID, req.DeviceLabel); err != nil {
+	token, err := a.startSession(r.Context(), w, u.ID, req.DeviceLabel)
+	if err != nil {
 		writeErr(w, err)
 		return
 	}
 	a.send(r.Context(), email.PasswordChanged(u.Email))
-	writeJSON(w, http.StatusOK, map[string]string{"userId": u.ID.String()})
+	resp := map[string]any{"userId": u.ID.String()}
+	if wantsBearerToken(r) {
+		resp["token"] = token
+	}
+	writeJSON(w, http.StatusOK, resp)
 }
 
 // ---------------------------------------------------------------------------

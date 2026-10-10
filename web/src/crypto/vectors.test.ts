@@ -4,6 +4,7 @@
 // PLAN.md §10.6). Regenerate deliberately with UPDATE_CRYPTO_VECTORS=1.
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'
 import { beforeAll, describe, expect, it } from 'vitest'
+import { createHmac } from 'node:crypto'
 import {
   bucketSize,
   decryptRecord,
@@ -23,6 +24,21 @@ import {
 import { fromPhrase, recoveryKey, toPhrase } from './recovery'
 
 const FILE = new URL('../../../docs/crypto-vectors.json', import.meta.url)
+const SHARED = new URL(
+  '../../../docs/shared/crypto-vectors.json',
+  import.meta.url,
+)
+
+function syncIdFrom(key: string, syncIdKey: Uint8Array): string {
+  const mac = createHmac('sha256', Buffer.from(syncIdKey))
+    .update(key)
+    .digest()
+    .subarray(0, 16)
+  mac[6] = (mac[6]! & 0x0f) | 0x40
+  mac[8] = (mac[8]! & 0x3f) | 0x80
+  const hex = mac.toString('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
 
 const INPUT = {
   password: 'correct horse battery staple ✓ Ünïcode',
@@ -70,6 +86,46 @@ async function compute() {
     keyId: 1,
   }
   const env = encryptRecord(ak, meta, INPUT.record, fromHex(INPUT.recordNonce))
+
+  // W0 additions: recovery proof, sync id, sync wire envelope ({k,v} / {k,d}).
+  const recoveryProof = await hkdf(
+    fromHex(INPUT.recoveryEntropy),
+    LABELS.recoveryProof,
+  )
+  const syncIdKey = await hkdf(ak, LABELS.syncId)
+  const entityKey = `todos/${INPUT.recordId}`
+  const wireId = syncIdFrom(entityKey, syncIdKey)
+  const syncPayload = { k: entityKey, v: INPUT.record }
+  const syncMeta = {
+    userId: INPUT.userId,
+    recordId: `sync/${wireId}`,
+    schemaVersion: 1,
+    keyId: 1,
+  }
+  const syncEnv = encryptRecord(
+    ak,
+    syncMeta,
+    syncPayload,
+    fromHex(INPUT.recordNonce),
+  )
+  const tombPayload = { k: entityKey, d: '0cre66i9s-0000-dev1' }
+  const tombEnv = encryptRecord(
+    ak,
+    syncMeta,
+    tombPayload,
+    fromHex(INPUT.recordNonce),
+  )
+  const uppercaseMeta = {
+    ...syncMeta,
+    userId: INPUT.userId.toUpperCase(),
+  }
+  let uppercaseDecryptFails = false
+  try {
+    decryptRecord(ak, uppercaseMeta, syncEnv)
+  } catch {
+    uppercaseDecryptFails = true
+  }
+
   return {
     input: INPUT,
     output: {
@@ -83,6 +139,19 @@ async function compute() {
       recordAad: `${LABELS.record}|${meta.userId}|${meta.recordId}|v1|alg1|key1`,
       recordPlaintextJson: JSON.stringify(INPUT.record),
       recordCiphertext: toHex(env.ciphertext),
+      recoveryProof: toHex(recoveryProof),
+      syncIdKey: toHex(syncIdKey),
+      syncEntityKey: entityKey,
+      syncWireId: wireId,
+      syncRecordAad: `${LABELS.record}|${syncMeta.userId}|${syncMeta.recordId}|v1|alg1|key1`,
+      syncPlaintextJson: JSON.stringify(syncPayload),
+      syncCiphertext: toHex(syncEnv.ciphertext),
+      syncTombstonePlaintextJson: JSON.stringify(tombPayload),
+      syncTombstoneCiphertext: toHex(tombEnv.ciphertext),
+      uppercaseUserIdDecryptFails: uppercaseDecryptFails,
+      padBuckets: [1, 255, 256, 511, 2047, 2048, 5000].map((n) =>
+        bucketSize(n + 1),
+      ),
     },
   }
 }
@@ -93,9 +162,13 @@ describe('crypto vectors', () => {
   it('match docs/crypto-vectors.json (shared with Go)', async () => {
     const got = await compute()
     if (process.env.UPDATE_CRYPTO_VECTORS === '1' || !existsSync(FILE)) {
-      writeFileSync(FILE, JSON.stringify(got, null, 2) + '\n')
+      const body = JSON.stringify(got, null, 2) + '\n'
+      writeFileSync(FILE, body)
+      writeFileSync(SHARED, body)
     }
     expect(got).toEqual(JSON.parse(readFileSync(FILE, 'utf8')))
+    expect(got).toEqual(JSON.parse(readFileSync(SHARED, 'utf8')))
+    expect(got.output.uppercaseUserIdDecryptFails).toBe(true)
   }, 30_000)
 })
 
