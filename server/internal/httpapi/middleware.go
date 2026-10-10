@@ -3,6 +3,7 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -44,13 +45,25 @@ func recoverer(logger *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-// requireClientHeader rejects state-changing API requests that lack the
-// X-Dayrule-Client header. Browsers can't send custom headers cross-site
-// without a CORS preflight we never allow, so with SameSite=Strict cookies
-// this blocks cross-site request forgery (PLAN.md §11.6).
+// recognisedClient accepts the PWA ("web") and native clients ("ios/<build>").
+func recognisedClient(h string) bool {
+	if h == "web" {
+		return true
+	}
+	if strings.HasPrefix(h, "ios/") {
+		build := h[len("ios/"):]
+		return build != "" && !strings.ContainsAny(build, " \t\r\n")
+	}
+	return false
+}
+
+// requireClientHeader rejects state-changing API requests that lack a
+// recognised X-Dayrule-Client header. Browsers can't send custom headers
+// cross-site without a CORS preflight we never allow, so with SameSite=Strict
+// cookies this blocks cross-site request forgery (PLAN.md §11.6).
 func requireClientHeader(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodGet && r.Method != http.MethodHead && r.Header.Get("X-Dayrule-Client") == "" {
+		if r.Method != http.MethodGet && r.Method != http.MethodHead && !recognisedClient(r.Header.Get("X-Dayrule-Client")) {
 			writeJSON(w, http.StatusForbidden, map[string]string{"error": "Missing client header.", "code": "forbidden"})
 			return
 		}

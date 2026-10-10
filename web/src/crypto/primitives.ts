@@ -84,6 +84,7 @@ export const LABELS = {
   auth: 'dayrule/auth/v1',
   kek: 'dayrule/kek/v1',
   recovery: 'dayrule/recovery/v1',
+  recoveryProof: 'dayrule/recovery-proof/v1',
   wrapUnderKek: 'dayrule/wrap/password/v1',
   wrapRecovery: 'dayrule/wrap/recovery/v1',
   wrapDevice: 'dayrule/wrap/device/v1',
