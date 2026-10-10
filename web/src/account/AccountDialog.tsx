@@ -32,6 +32,13 @@ import {
   useReminderSettings,
   type Channel,
 } from '../reminders/reminders'
+import {
+  addSignInPasskey,
+  listSignInPasskeys,
+  removeSignInPasskey,
+  type SignInPasskey,
+} from './twostep'
+import { deviceLabel } from './api'
 import { ErrorText, Field } from './ui'
 import { message, newPasswordProblem } from './validation'
 
@@ -129,6 +136,7 @@ function AccountSettings() {
     <>
       <EmailSection email={profile.email} />
       <PasswordSection />
+      <TwoStepSection />
       <DevicesSection remember={profile.remember} />
       <RemindersSection />
       <DataSection />
@@ -259,6 +267,133 @@ function PasswordSection() {
           Change password
         </button>
       </form>
+    </Section>
+  )
+}
+
+/** Passkeys the server asks for after the password (decision 30). */
+function TwoStepSection() {
+  const [keys, setKeys] = useState<SignInPasskey[] | null>(null)
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [removePassword, setRemovePassword] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const f = useForm()
+  const load = () =>
+    listSignInPasskeys()
+      .then(setKeys)
+      .catch((err: unknown) => setLoadError(message(err)))
+  useEffect(() => {
+    void load()
+  }, [])
+  if (!passkeysAvailable()) return null
+  const here = window.location.hostname // the RP ID: no port
+  return (
+    <Section title="Two-step sign-in">
+      <p className="mb-3 text-sm text-text-secondary">
+        When you sign in on a new device, Dayrule asks for one of these passkeys
+        after your password, so a stolen password isn’t enough. Your recovery
+        phrase still works without one.
+      </p>
+      <ErrorText error={loadError ?? f.error} />
+      <Done text={f.done} />
+      {keys && keys.length > 0 && (
+        <ul className="mb-3 divide-y divide-hairline text-sm">
+          {keys.map((k) => (
+            <li key={k.id} className="py-2">
+              <div className="flex items-center gap-3">
+                <span className="flex-1">
+                  {k.label}
+                  <span className="block text-xs text-text-secondary">
+                    {k.site !== here && `Works on ${k.site}. `}
+                    {k.lastUsedAt
+                      ? `Last used ${formatDisplayDate(toLocalDate(new Date(k.lastUsedAt)))}`
+                      : 'Not used yet'}
+                  </span>
+                </span>
+                {removing !== k.id && (
+                  <button
+                    type="button"
+                    className="text-accent hover:underline"
+                    onClick={() => {
+                      setRemoving(k.id)
+                      setRemovePassword('')
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {removing === k.id && (
+                <form
+                  className="mt-2"
+                  aria-label={`Remove ${k.label}`}
+                  onSubmit={f.run(async () => {
+                    await removeSignInPasskey(k.id, removePassword)
+                    setRemoving(null)
+                    await load()
+                    return keys.length > 1
+                      ? 'Passkey removed.'
+                      : 'Passkey removed. Signing in now needs only your password.'
+                  })}
+                >
+                  <Field
+                    label="Password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={removePassword}
+                    onChange={(e) => setRemovePassword(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={f.busy} className={button}>
+                      Remove passkey
+                    </button>
+                    <button
+                      type="button"
+                      className="text-sm text-accent hover:underline"
+                      onClick={() => setRemoving(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {removing === null && (
+        <form
+          aria-label="Add a sign-in passkey"
+          onSubmit={f.run(async () => {
+            await addSignInPasskey(name.trim() || deviceLabel(), password)
+            setName('')
+            setPassword('')
+            await load()
+            return 'Passkey added. Signing in on a new device now needs it too.'
+          })}
+        >
+          <Field
+            label="Name (optional)"
+            value={name}
+            placeholder={deviceLabel()}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Field
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <button type="submit" disabled={f.busy} className={button}>
+            Add a passkey
+          </button>
+        </form>
+      )}
     </Section>
   )
 }

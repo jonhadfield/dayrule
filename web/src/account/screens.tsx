@@ -4,12 +4,14 @@ import {
   recover,
   register,
   signIn,
+  signInWithPasskey,
   signOut,
   signUpStart,
   signUpVerify,
   unlock,
   useAccount,
   type PendingAccount,
+  type SecondStep,
 } from './session'
 import { unlockWithPasskey } from './passkey'
 import { AuthShell, ErrorText, Field, LinkButton, Remember, Submit } from './ui'
@@ -60,10 +62,24 @@ function SignIn({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
+  const [step, setStep] = useState<SecondStep | null>(null)
   const { busy, error, run } = useSubmit()
+  if (step)
+    return (
+      <PasskeyStep
+        step={step}
+        email={email}
+        remember={remember}
+        onRecover={onRecover}
+      />
+    )
   return (
     <AuthShell title="Sign in">
-      <form onSubmit={run(() => signIn(email, password, remember))}>
+      <form
+        onSubmit={run(async () =>
+          setStep(await signIn(email, password, remember)),
+        )}
+      >
         <ErrorText error={error} />
         <Field
           label="Email"
@@ -87,6 +103,42 @@ function SignIn({
       <div className="mt-5 flex justify-between">
         <LinkButton onClick={onSignUp}>Create an account</LinkButton>
         <LinkButton onClick={onRecover}>Forgot password?</LinkButton>
+      </div>
+    </AuthShell>
+  )
+}
+
+/**
+ * Two-step sign-in (decision 30): the password was right, and the account
+ * also asks for one of its passkeys. A button, not an automatic prompt:
+ * some browsers only show the passkey prompt straight after a tap.
+ */
+function PasskeyStep({
+  step,
+  email,
+  remember,
+  onRecover,
+}: {
+  step: SecondStep
+  email: string
+  remember: boolean
+  onRecover: () => void
+}) {
+  const { busy, error, run } = useSubmit()
+  return (
+    <AuthShell
+      title="Use your passkey"
+      subtitle="Your account asks for a passkey as well as your password when you sign in on a new device."
+    >
+      <form onSubmit={run(() => signInWithPasskey(step, email, remember))}>
+        <ErrorText error={error} />
+        <Submit busy={busy}>Use passkey</Submit>
+      </form>
+      <div className="mt-5 flex justify-between">
+        <LinkButton onClick={() => window.location.assign('/')}>
+          Start again
+        </LinkButton>
+        <LinkButton onClick={onRecover}>Lost your passkey?</LinkButton>
       </div>
     </AuthShell>
   )

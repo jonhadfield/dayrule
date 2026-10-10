@@ -132,10 +132,10 @@ func options(t *testing.T, r resp) map[string]any {
 func addPasskey(t *testing.T, a account, k *authenticator, label string) resp {
 	t.Helper()
 	a.c.origin = testOrigin
-	r := a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{})
+	r := a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{"currentAuthKey": a.authKey})
 	opts := options(t, r)
 	return a.c.do("POST", "/api/v1/account/passkeys", map[string]any{
-		"token": r.body["token"], "credential": k.create(opts), "label": label, "currentAuthKey": a.authKey,
+		"token": r.body["token"], "credential": k.create(opts), "label": label,
 	})
 }
 
@@ -277,29 +277,28 @@ func TestPasskeyManagement(t *testing.T) {
 	a := hs.signUp("lee@example.com")
 	key := newAuthenticator(t)
 
-	t.Run("adding needs the password", func(t *testing.T) {
+	t.Run("adding needs the password, before any prompt", func(t *testing.T) {
 		a.c.origin = testOrigin
-		r := a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{})
-		opts := options(t, r)
-		wantCode(t, "wrong password", a.c.do("POST", "/api/v1/account/passkeys", map[string]any{
-			"token": r.body["token"], "credential": key.create(opts), "currentAuthKey": rnd(32),
-		}), 401, "bad_login")
+		wantCode(t, "wrong password", a.c.do("POST", "/api/v1/account/passkeys/options",
+			map[string]any{"currentAuthKey": rnd(32)}), 401, "bad_login")
+		wantCode(t, "no password", a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{}), 400, "")
 	})
 
 	t.Run("adding is tied to the session that started it", func(t *testing.T) {
 		a.c.origin = testOrigin
-		r := a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{})
+		r := a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{"currentAuthKey": a.authKey})
 		opts := options(t, r)
 		other := &client{hs: hs, origin: testOrigin}
 		other.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey})
 		wantCode(t, "finish on another device", other.do("POST", "/api/v1/account/passkeys", map[string]any{
-			"token": r.body["token"], "credential": key.create(opts), "currentAuthKey": a.authKey,
+			"token": r.body["token"], "credential": key.create(opts),
 		}), 400, "bad_ceremony")
 	})
 
 	t.Run("only from a known origin", func(t *testing.T) {
 		a.c.origin = "https://evil.example"
-		wantCode(t, "options", a.c.do("POST", "/api/v1/account/passkeys/options", map[string]any{}), 400, "passkey_origin")
+		wantCode(t, "options", a.c.do("POST", "/api/v1/account/passkeys/options",
+			map[string]any{"currentAuthKey": a.authKey}), 400, "passkey_origin")
 	})
 
 	t.Run("a passkey from another site is refused", func(t *testing.T) {

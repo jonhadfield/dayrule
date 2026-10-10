@@ -10,6 +10,11 @@ import type { Credentials, WrappedB64 } from '../crypto/keyring'
 import type { KdfParams } from '../crypto/primitives'
 import { api, deviceLabel } from './api'
 import { profiles, type Profile } from './profile'
+import {
+  requestJSON,
+  requestOptions,
+  type RequestOptionsJSON,
+} from './webauthn'
 
 export type AccountStatus = 'loading' | 'signed-out' | 'locked' | 'unlocked'
 
@@ -126,25 +131,84 @@ export async function register(
 // ---------------------------------------------------------------------------
 // Sign-in and unlock
 
+/** The server wants a second step before it signs this device in (decision 30). */
+export interface SecondStep {
+  token: string
+  methods: string[]
+}
+
+interface LoginResponse {
+  userId: string
+  wrappedPassword: WrappedB64
+  salt: string
+  kdf: KdfParams
+}
+
+/**
+ * Sign in with the password. Returns the second step if the account has one
+ * (then call signInWithPasskey), or null once this device is unlocked.
+ */
 export async function signIn(
   email: string,
   password: string,
   remember: boolean,
-): Promise<void> {
+): Promise<SecondStep | null> {
   const pre = await api<{ salt: string; kdf: KdfParams }>(
     'POST',
     '/auth/prelogin',
     { email },
   )
-  const k = keyring()
-  const authKey = await k.beginLogin(password, pre.salt, pre.kdf)
-  const r = await api<{
-    userId: string
-    wrappedPassword: WrappedB64
-    salt: string
-    kdf: KdfParams
-  }>('POST', '/auth/login', { email, authKey, deviceLabel: deviceLabel() })
-  await k.finishLogin(r.userId, r.wrappedPassword)
+  const authKey = await keyring().beginLogin(password, pre.salt, pre.kdf)
+  const r = await api<LoginResponse | { secondStep: SecondStep }>(
+    'POST',
+    '/auth/login',
+    { email, authKey, deviceLabel: deviceLabel() },
+  )
+  if ('secondStep' in r) return r.secondStep
+  await finishSignIn(r, email, remember)
+  return null
+}
+
+/**
+ * The second step with a passkey the server verifies. The password from
+ * signIn is still held by the crypto worker, so the account key unwraps as
+ * soon as the server hands it over. Can be retried while the step lasts.
+ */
+export async function signInWithPasskey(
+  step: SecondStep,
+  email: string,
+  remember: boolean,
+): Promise<void> {
+  const { options } = await api<{ options: RequestOptionsJSON }>(
+    'POST',
+    '/auth/login/passkey/options',
+    { token: step.token },
+  )
+  let cred: Credential | null
+  try {
+    cred = await navigator.credentials.get({
+      publicKey: requestOptions(options),
+    })
+  } catch {
+    cred = null
+  }
+  if (!cred)
+    throw new Error(
+      'The passkey wasn’t used. Try again, or reset your password with your recovery phrase.',
+    )
+  const r = await api<LoginResponse>('POST', '/auth/login/passkey', {
+    token: step.token,
+    credential: requestJSON(cred as PublicKeyCredential),
+  })
+  await finishSignIn(r, email, remember)
+}
+
+async function finishSignIn(
+  r: LoginResponse,
+  email: string,
+  remember: boolean,
+): Promise<void> {
+  await keyring().finishLogin(r.userId, r.wrappedPassword)
   await finishUnlock(
     {
       userId: r.userId,
@@ -264,7 +328,7 @@ function currentProfile(): Profile {
 }
 
 /** The AuthKey for a password, to prove it to the server. */
-async function authKeyFor(password: string): Promise<string> {
+export async function authKeyFor(password: string): Promise<string> {
   const p = currentProfile()
   return keyring().beginLogin(password, p.salt, p.kdf)
 }

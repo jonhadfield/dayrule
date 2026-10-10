@@ -315,7 +315,10 @@ func (a *Accounts) listPasskeys(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *Accounts) passkeyOptions(w http.ResponseWriter, r *http.Request) {
-	if err := decode(r, &struct{}{}); err != nil {
+	var req struct {
+		CurrentAuthKey string `json:"currentAuthKey"`
+	}
+	if err := decode(r, &req); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -330,6 +333,12 @@ func (a *Accounts) passkeyOptions(w http.ResponseWriter, r *http.Request) {
 	}
 	u, s, ok := a.currentUser(w, r)
 	if !ok {
+		return
+	}
+	// Adding a sign-in step needs the password too, not just a session. It
+	// is checked here, before the authenticator makes a passkey.
+	if err := a.checkPassword(r.Context(), u, req.CurrentAuthKey); err != nil {
+		writeErr(w, err)
 		return
 	}
 	pu, err := a.passkeyUser(r, wa, u)
@@ -374,10 +383,9 @@ func (a *Accounts) passkeyOptions(w http.ResponseWriter, r *http.Request) {
 
 func (a *Accounts) addPasskey(w http.ResponseWriter, r *http.Request) {
 	var req struct {
-		Token          string          `json:"token"`
-		Credential     json.RawMessage `json:"credential"`
-		Label          string          `json:"label"`
-		CurrentAuthKey string          `json:"currentAuthKey"`
+		Token      string          `json:"token"`
+		Credential json.RawMessage `json:"credential"`
+		Label      string          `json:"label"`
 	}
 	if err := decode(r, &req); err != nil {
 		writeErr(w, err)
@@ -392,13 +400,9 @@ func (a *Accounts) addPasskey(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	// The password was checked when this ceremony started, in this session.
 	u, s, ok := a.currentUser(w, r)
 	if !ok {
-		return
-	}
-	// Adding a sign-in step needs the password too, not just a session.
-	if err := a.checkPassword(r.Context(), u, req.CurrentAuthKey); err != nil {
-		writeErr(w, err)
 		return
 	}
 	hash := auth.TokenHash(req.Token)
