@@ -179,7 +179,7 @@ func wantsBearerToken(r *http.Request) bool {
 	if r.Header.Get("Origin") != "" || r.Header.Get("Sec-Fetch-Site") != "" || r.Header.Get("Sec-Fetch-Mode") != "" {
 		return false
 	}
-	return strings.HasPrefix(r.Header.Get("X-Dayrule-Client"), "ios/")
+	return nativeClient(r.Header.Get("X-Dayrule-Client"))
 }
 
 // sessionCredential reads the Bearer token or the session cookie.

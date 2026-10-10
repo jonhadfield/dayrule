@@ -45,16 +45,23 @@ func recoverer(logger *slog.Logger, next http.Handler) http.Handler {
 	})
 }
 
-// recognisedClient accepts the PWA ("web") and native clients ("ios/<build>").
-func recognisedClient(h string) bool {
-	if h == "web" {
-		return true
-	}
-	if strings.HasPrefix(h, "ios/") {
-		build := h[len("ios/"):]
-		return build != "" && !strings.ContainsAny(build, " \t\r\n")
+// nativeClients are the X-Dayrule-Client prefixes of the native apps, each
+// followed by a build ("ios/<build>", "macos/<build>").
+var nativeClients = []string{"ios/", "macos/"}
+
+// nativeClient reports whether a client header names a native app build.
+func nativeClient(h string) bool {
+	for _, p := range nativeClients {
+		if build, ok := strings.CutPrefix(h, p); ok {
+			return build != "" && !strings.ContainsAny(build, " \t\r\n")
+		}
 	}
 	return false
+}
+
+// recognisedClient accepts the PWA ("web") and the native apps.
+func recognisedClient(h string) bool {
+	return h == "web" || nativeClient(h)
 }
 
 // requireClientHeader rejects state-changing API requests that lack a

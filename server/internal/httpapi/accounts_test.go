@@ -411,31 +411,48 @@ func TestSessionCookieAttributes(t *testing.T) {
 }
 
 func TestNativeBearerSession(t *testing.T) {
-	hs := newHarness(t)
-	a := hs.signUp("ios@example.com")
-	a.c.cookie = "" // drop the cookie from sign-up
+	for _, app := range []string{"ios", "macos"} {
+		t.Run(app, func(t *testing.T) {
+			hs := newHarness(t)
+			addr := app + "@example.com"
+			a := hs.signUp(addr)
+			a.c.cookie = "" // drop the cookie from sign-up
 
-	ios := &client{hs: hs, header: "ios/1"}
-	r := ios.do("POST", "/api/v1/auth/login", map[string]string{
-		"email": a.email, "authKey": a.authKey, "deviceLabel": "iPhone",
-	})
-	if r.code != 200 {
-		t.Fatalf("login = %d %v", r.code, r.body)
+			native := &client{hs: hs, header: app + "/1"}
+			r := native.do("POST", "/api/v1/auth/login", map[string]string{
+				"email": a.email, "authKey": a.authKey, "deviceLabel": "Native",
+			})
+			if r.code != 200 {
+				t.Fatalf("login = %d %v", r.code, r.body)
+			}
+			token, _ := r.body["token"].(string)
+			if token == "" {
+				t.Fatalf("native login missing token: %v", r.body)
+			}
+			native.bearer = token
+			native.cookie = "" // use Bearer only
+			if r := native.do("GET", "/api/v1/account", nil); r.code != 200 || r.body["email"] != addr {
+				t.Fatalf("bearer account = %d %v", r.code, r.body)
+			}
+			if r := native.do("POST", "/api/v1/auth/logout", nil); r.code != 204 {
+				t.Fatalf("logout = %d", r.code)
+			}
+			if r := native.do("GET", "/api/v1/account", nil); r.code != 401 {
+				t.Fatalf("after logout = %d, want 401", r.code)
+			}
+		})
 	}
-	token, _ := r.body["token"].(string)
-	if token == "" {
-		t.Fatalf("native login missing token: %v", r.body)
-	}
-	ios.bearer = token
-	ios.cookie = "" // use Bearer only
-	if r := ios.do("GET", "/api/v1/account", nil); r.code != 200 || r.body["email"] != "ios@example.com" {
-		t.Fatalf("bearer account = %d %v", r.code, r.body)
-	}
-	if r := ios.do("POST", "/api/v1/auth/logout", nil); r.code != 204 {
-		t.Fatalf("logout = %d", r.code)
-	}
-	if r := ios.do("GET", "/api/v1/account", nil); r.code != 401 {
-		t.Fatalf("after logout = %d, want 401", r.code)
+}
+
+func TestRecognisedClient(t *testing.T) {
+	for h, want := range map[string]bool{
+		"web": true, "ios/1": true, "macos/1": true, "macos/2026.10.1": true,
+		"": false, "ios/": false, "macos/": false, "macos/1 2": false, "macos": false,
+		"android/1": false, "Web": false, "webx": false, "xmacos/1": false,
+	} {
+		if got := recognisedClient(h); got != want {
+			t.Errorf("recognisedClient(%q) = %v, want %v", h, got, want)
+		}
 	}
 }
 
