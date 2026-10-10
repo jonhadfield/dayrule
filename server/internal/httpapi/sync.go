@@ -173,5 +173,10 @@ func (s *Sync) gc(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int64{"purgedTombstones": purged})
+	reminded, err := s.Accounts.RemindResets(r.Context())
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"purgedTombstones": purged, "resetWarnings": int64(reminded)})
 }

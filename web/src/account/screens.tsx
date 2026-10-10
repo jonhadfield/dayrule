@@ -4,14 +4,18 @@ import {
   recover,
   register,
   signIn,
+  signInWithCode,
+  signInWithPasskey,
   signOut,
   signUpStart,
   signUpVerify,
   unlock,
   useAccount,
   type PendingAccount,
+  type SecondStep,
 } from './session'
 import { unlockWithPasskey } from './passkey'
+import { confirmTwoStepReset, resetDate, startTwoStepReset } from './twostep'
 import { AuthShell, ErrorText, Field, LinkButton, Remember, Submit } from './ui'
 import { message, newPasswordProblem } from './validation'
 
@@ -60,10 +64,24 @@ function SignIn({
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [remember, setRemember] = useState(false)
+  const [step, setStep] = useState<SecondStep | null>(null)
   const { busy, error, run } = useSubmit()
+  if (step)
+    return (
+      <SecondStepScreen
+        step={step}
+        email={email}
+        remember={remember}
+        onRecover={onRecover}
+      />
+    )
   return (
     <AuthShell title="Sign in">
-      <form onSubmit={run(() => signIn(email, password, remember))}>
+      <form
+        onSubmit={run(async () =>
+          setStep(await signIn(email, password, remember)),
+        )}
+      >
         <ErrorText error={error} />
         <Field
           label="Email"
@@ -87,6 +105,192 @@ function SignIn({
       <div className="mt-5 flex justify-between">
         <LinkButton onClick={onSignUp}>Create an account</LinkButton>
         <LinkButton onClick={onRecover}>Forgot password?</LinkButton>
+      </div>
+    </AuthShell>
+  )
+}
+
+/**
+ * Two-step sign-in (decision 30): the password was right, and the account
+ * also asks for a passkey or a code (authenticator app or backup code). The
+ * passkey is a button, not an automatic prompt: some browsers only show the
+ * passkey prompt straight after a tap.
+ */
+function SecondStepScreen({
+  step,
+  email,
+  remember,
+  onRecover,
+}: {
+  step: SecondStep
+  email: string
+  remember: boolean
+  onRecover: () => void
+}) {
+  const passkey = step.methods.includes('passkey')
+  const totp = step.methods.includes('totp')
+  const backup = step.methods.includes('backup')
+  const [code, setCode] = useState('')
+  const [help, setHelp] = useState(false)
+  const [resetDueAt, setResetDueAt] = useState(step.resetDueAt ?? null)
+  const { busy, error, run } = useSubmit()
+  if (help)
+    return (
+      <ResetByEmail
+        token={step.token}
+        email={email}
+        due={resetDueAt}
+        onDue={setResetDueAt}
+        onRecover={onRecover}
+        onBack={() => setHelp(false)}
+      />
+    )
+  const codeLabel = totp
+    ? backup
+      ? 'Code from your authenticator app, or a backup code'
+      : 'Code from your authenticator app'
+    : 'Backup code'
+  return (
+    <AuthShell
+      title={passkey ? 'Use your passkey' : 'Enter your code'}
+      subtitle="Your account asks for a second step as well as your password when you sign in on a new device."
+    >
+      <ErrorText error={error} />
+      {resetDueAt && (
+        <p className="mb-4 rounded-[6px] border border-hairline p-3 text-sm">
+          Two-step sign-in is set to turn off on {resetDate(resetDueAt)}, as
+          asked by email. Signing in with your second step cancels that.
+        </p>
+      )}
+      {passkey && (
+        <form onSubmit={run(() => signInWithPasskey(step, email, remember))}>
+          <Submit busy={busy}>Use passkey</Submit>
+        </form>
+      )}
+      {(totp || backup) && (
+        <form
+          aria-label="Sign in with a code"
+          className={passkey ? 'mt-5 border-t border-hairline pt-5' : ''}
+          onSubmit={run(() => signInWithCode(step, email, remember, code))}
+        >
+          {passkey && (
+            <p className="mb-3 text-sm text-text-secondary">
+              Or use a code instead.
+            </p>
+          )}
+          <Field
+            label={codeLabel}
+            autoComplete="one-time-code"
+            inputMode={backup ? 'text' : 'numeric'}
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          {passkey ? (
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-full border border-hairline px-4 py-2 text-sm font-medium hover:border-accent disabled:opacity-60"
+            >
+              Continue with code
+            </button>
+          ) : (
+            <Submit busy={busy}>Continue</Submit>
+          )}
+        </form>
+      )}
+      <div className="mt-5 flex justify-between">
+        <LinkButton onClick={() => window.location.assign('/')}>
+          Start again
+        </LinkButton>
+        <LinkButton onClick={() => setHelp(true)}>
+          {passkey && !totp && !backup
+            ? 'Lost your passkey?'
+            : 'Can’t use any of these?'}
+        </LinkButton>
+      </div>
+    </AuthShell>
+  )
+}
+
+/**
+ * No second step to hand (PLAN.md §10.2): the recovery phrase signs in
+ * without one, or an emailed code turns two-step sign-in off after 7 days.
+ */
+function ResetByEmail({
+  token,
+  email,
+  due,
+  onDue,
+  onRecover,
+  onBack,
+}: {
+  token: string
+  email: string
+  /** When a pending reset takes effect, if there is one. */
+  due: string | null
+  onDue: (due: string) => void
+  onRecover: () => void
+  onBack: () => void
+}) {
+  const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
+  const { busy, error, run } = useSubmit()
+  return (
+    <AuthShell title="Can’t use your second step?">
+      <p className="mb-3 text-sm">
+        Your 24-word recovery phrase signs you in without a second step, and
+        lets you set a new password.
+      </p>
+      <LinkButton onClick={onRecover}>Use your recovery phrase</LinkButton>
+      <h2 className="mt-6 mb-2 font-serif text-lg font-semibold">
+        No recovery phrase either?
+      </h2>
+      <ErrorText error={error} />
+      {due ? (
+        <p role="status" className="mb-3 text-sm text-ready">
+          Two-step sign-in will be turned off on {resetDate(due)}. From then,
+          your password alone signs in. We’ll email {email} before it happens.
+        </p>
+      ) : sent ? (
+        <form
+          aria-label="Confirm turning off two-step sign-in"
+          onSubmit={run(async () =>
+            onDue(await confirmTwoStepReset(email, code)),
+          )}
+        >
+          <Field
+            label="Code from the email"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Submit busy={busy}>Turn off in 7 days</Submit>
+        </form>
+      ) : (
+        <form
+          onSubmit={run(async () => {
+            const pending = await startTwoStepReset(token)
+            if (pending) onDue(pending)
+            else setSent(true)
+          })}
+        >
+          <p className="mb-3 text-sm text-text-secondary">
+            We can turn off two-step sign-in with a code emailed to {email}. It
+            takes 7 days, so that if someone else has your password, you have
+            time to stop them: we email you throughout, and signing in with your
+            second step cancels it. Your to-dos stay encrypted with your
+            password all along.
+          </p>
+          <Submit busy={busy}>Email me a code</Submit>
+        </form>
+      )}
+      <div className="mt-5">
+        <LinkButton onClick={onBack}>Back</LinkButton>
       </div>
     </AuthShell>
   )

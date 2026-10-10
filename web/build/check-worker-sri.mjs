@@ -19,7 +19,9 @@ async function signIn(tamper) {
       r.fulfill({
         json: {
           salt: 'AAAAAAAAAAAAAAAAAAAAAA==',
-          kdf: { v: 1, ops: 1, mem: 8 * 1024 * 1024 },
+          // The lowest the client accepts (web/src/account/kdf.ts); anything
+          // cheaper is refused before the crypto worker starts.
+          kdf: { v: 1, ops: 3, mem: 64 * 1024 * 1024 },
         },
       }),
     )

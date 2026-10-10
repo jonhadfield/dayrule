@@ -9,18 +9,27 @@ import { keyring } from '../crypto/client'
 import type { Credentials, WrappedB64 } from '../crypto/keyring'
 import type { KdfParams } from '../crypto/primitives'
 import { api, deviceLabel } from './api'
+import { checkServerKdf } from './kdf'
 import { profiles, type Profile } from './profile'
+import {
+  requestJSON,
+  requestOptions,
+  type RequestOptionsJSON,
+} from './webauthn'
 
 export type AccountStatus = 'loading' | 'signed-out' | 'locked' | 'unlocked'
 
 interface AccountState {
   status: AccountStatus
   profile: Profile | null
+  /** Just signed up: suggest a second step for sign-in (decision 30). */
+  suggestTwoStep: boolean
 }
 
 export const useAccount = create<AccountState>(() => ({
   status: 'loading',
   profile: null,
+  suggestTwoStep: false,
 }))
 
 const set = (s: Partial<AccountState>) => useAccount.setState(s)
@@ -110,6 +119,7 @@ export async function register(
     recoveryProof: pending.recoveryProof,
     deviceLabel: deviceLabel(),
   })
+  set({ suggestTwoStep: true })
   await finishUnlock(
     {
       userId: pending.userId,
@@ -126,25 +136,108 @@ export async function register(
 // ---------------------------------------------------------------------------
 // Sign-in and unlock
 
+/** The server wants a second step before it signs this device in (decision 30). */
+export interface SecondStep {
+  token: string
+  methods: string[]
+  /** When a reset by email will turn two-step sign-in off, if one is pending. */
+  resetDueAt?: string | null
+}
+
+interface LoginResponse {
+  userId: string
+  wrappedPassword: WrappedB64
+  salt: string
+  kdf: KdfParams
+}
+
+/**
+ * Sign in with the password. Returns the second step if the account has one
+ * (then call signInWithPasskey or signInWithCode), or null once this device
+ * is unlocked.
+ */
 export async function signIn(
   email: string,
   password: string,
   remember: boolean,
-): Promise<void> {
+): Promise<SecondStep | null> {
   const pre = await api<{ salt: string; kdf: KdfParams }>(
     'POST',
     '/auth/prelogin',
     { email },
   )
-  const k = keyring()
-  const authKey = await k.beginLogin(password, pre.salt, pre.kdf)
-  const r = await api<{
-    userId: string
-    wrappedPassword: WrappedB64
-    salt: string
-    kdf: KdfParams
-  }>('POST', '/auth/login', { email, authKey, deviceLabel: deviceLabel() })
-  await k.finishLogin(r.userId, r.wrappedPassword)
+  checkServerKdf(pre.kdf)
+  const authKey = await keyring().beginLogin(password, pre.salt, pre.kdf)
+  const r = await api<LoginResponse | { secondStep: SecondStep }>(
+    'POST',
+    '/auth/login',
+    { email, authKey, deviceLabel: deviceLabel() },
+  )
+  if ('secondStep' in r) return r.secondStep
+  await finishSignIn(r, email, remember)
+  return null
+}
+
+/**
+ * The second step with a passkey the server verifies. The password from
+ * signIn is still held by the crypto worker, so the account key unwraps as
+ * soon as the server hands it over. Can be retried while the step lasts.
+ */
+export async function signInWithPasskey(
+  step: SecondStep,
+  email: string,
+  remember: boolean,
+): Promise<void> {
+  const { options } = await api<{ options: RequestOptionsJSON }>(
+    'POST',
+    '/auth/login/passkey/options',
+    { token: step.token },
+  )
+  let cred: Credential | null
+  try {
+    cred = await navigator.credentials.get({
+      publicKey: requestOptions(options),
+    })
+  } catch {
+    cred = null
+  }
+  if (!cred)
+    throw new Error(
+      'The passkey wasn’t used. Try again, or reset your password with your recovery phrase.',
+    )
+  const r = await api<LoginResponse>('POST', '/auth/login/passkey', {
+    token: step.token,
+    credential: requestJSON(cred as PublicKeyCredential),
+  })
+  await finishSignIn(r, email, remember)
+}
+
+/**
+ * The second step with a code from an authenticator app, or a backup code.
+ * Like signInWithPasskey, the password is still in the crypto worker.
+ */
+export async function signInWithCode(
+  step: SecondStep,
+  email: string,
+  remember: boolean,
+  code: string,
+): Promise<void> {
+  const r = await api<LoginResponse>('POST', '/auth/login/code', {
+    token: step.token,
+    code,
+  })
+  await finishSignIn(r, email, remember)
+}
+
+async function finishSignIn(
+  r: LoginResponse,
+  email: string,
+  remember: boolean,
+): Promise<void> {
+  // Cached on this device for offline unlock, so it gets the same check as
+  // prelogin's, whichever step signed in.
+  checkServerKdf(r.kdf)
+  await keyring().finishLogin(r.userId, r.wrappedPassword)
   await finishUnlock(
     {
       userId: r.userId,
@@ -175,6 +268,7 @@ export async function unlock(
 ): Promise<void> {
   const profile = useAccount.getState().profile
   if (!profile) throw new Error('Not signed in on this device.')
+  checkServerKdf(profile.kdf)
   const k = keyring()
   await k.beginLogin(password, profile.salt, profile.kdf)
   try {
@@ -245,6 +339,10 @@ export async function lock(): Promise<void> {
  * Sign out: end the server session and forget this device. The encrypted
  * data is kept: until sync (M4) it's the only copy of the to-dos.
  */
+export function dismissTwoStepSuggestion(): void {
+  set({ suggestTwoStep: false })
+}
+
 export async function signOut(): Promise<void> {
   const profile = useAccount.getState().profile
   await api('POST', '/auth/logout').catch(() => undefined)
@@ -264,8 +362,9 @@ function currentProfile(): Profile {
 }
 
 /** The AuthKey for a password, to prove it to the server. */
-async function authKeyFor(password: string): Promise<string> {
+export async function authKeyFor(password: string): Promise<string> {
   const p = currentProfile()
+  checkServerKdf(p.kdf)
   return keyring().beginLogin(password, p.salt, p.kdf)
 }
 

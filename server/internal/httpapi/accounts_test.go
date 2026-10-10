@@ -47,8 +47,12 @@ func newHarness(t *testing.T) *harness {
 	}
 	hs := &harness{t: t, mail: &email.Memory{}, keys: keys, store: store.Accounts{Pool: pool},
 		now: time.Date(2026, 10, 4, 12, 0, 0, 0, time.UTC)}
+	passkeys, err := NewPasskeys(store.Passkeys{Accounts: hs.store}, []string{testOrigin})
+	if err != nil {
+		t.Fatal(err)
+	}
 	acc := &Accounts{Store: hs.store, Keys: keys, Email: hs.mail, InviteOnly: true,
-		Now: func() time.Time { return hs.now }}
+		Now: func() time.Time { return hs.now }, Passkeys: passkeys}
 	hs.records = store.Records{Accounts: hs.store}
 	sync := &Sync{Accounts: acc, Store: hs.records, CronSecret: "cron-test-secret"}
 	hs.push = &push.Memory{Gone: map[string]bool{}}
@@ -71,6 +75,7 @@ func (hs *harness) newInvite() string {
 type client struct {
 	hs     *harness
 	cookie string
+	origin string // sent as the Origin header, as a browser does
 }
 
 type resp struct {
@@ -90,6 +95,9 @@ func (c *client) do(method, path string, body any) resp {
 	req.Header.Set("X-Dayrule-Client", "web")
 	if c.cookie != "" {
 		req.Header.Set("Cookie", sessionCookie+"="+c.cookie)
+	}
+	if c.origin != "" {
+		req.Header.Set("Origin", c.origin)
 	}
 	rec := httptest.NewRecorder()
 	c.hs.h.ServeHTTP(rec, req)

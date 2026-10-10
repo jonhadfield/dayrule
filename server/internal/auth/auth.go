@@ -23,6 +23,8 @@ import (
 type Keys struct {
 	code     []byte // HMAC key for email codes
 	fakeSalt []byte // HMAC key for deterministic fake salts
+	totp     []byte // XChaCha20-Poly1305 key for TOTP secrets at rest
+	backup   []byte // HMAC key for backup codes
 }
 
 // NewKeys derives the server's HMAC keys from a secret of at least 32 bytes.
@@ -37,7 +39,10 @@ func NewKeys(secret []byte) (Keys, error) {
 		}
 		return out
 	}
-	return Keys{code: derive("dayrule/server/code/v1"), fakeSalt: derive("dayrule/server/fake-salt/v1")}, nil
+	return Keys{
+		code: derive("dayrule/server/code/v1"), fakeSalt: derive("dayrule/server/fake-salt/v1"),
+		totp: derive("dayrule/server/totp/v1"), backup: derive("dayrule/server/backup-code/v1"),
+	}, nil
 }
 
 func (k Keys) mac(key []byte, parts ...string) []byte {

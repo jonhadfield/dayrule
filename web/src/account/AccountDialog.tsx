@@ -32,6 +32,22 @@ import {
   useReminderSettings,
   type Channel,
 } from '../reminders/reminders'
+import {
+  addSignInPasskey,
+  cancelTwoStepReset,
+  confirmTotp,
+  listSignInPasskeys,
+  makeBackupCodes,
+  removeSignInPasskey,
+  removeTotp,
+  resetDate,
+  startTotp,
+  twoStepStatus,
+  type SignInPasskey,
+  type TwoStepStatus,
+} from './twostep'
+import { QrCode } from './QrCode'
+import { deviceLabel } from './api'
 import { ErrorText, Field } from './ui'
 import { message, newPasswordProblem } from './validation'
 
@@ -39,9 +55,12 @@ import { message, newPasswordProblem } from './validation'
 export function AccountDialog({
   open,
   onOpenChange,
+  focus,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
+  /** A section to scroll to on opening. */
+  focus?: 'two-step'
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -55,7 +74,7 @@ export function AccountDialog({
             Your to-dos are encrypted on your devices. These settings never
             change that key.
           </Dialog.Description>
-          {open && <AccountSettings />}
+          {open && <AccountSettings focus={focus} />}
           <p className="text-xs text-text-secondary">
             <a
               href="/privacy"
@@ -81,9 +100,17 @@ export function AccountDialog({
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string
+  id?: string
+  children: ReactNode
+}) {
   return (
-    <section className="mb-6 border-t border-hairline pt-4">
+    <section id={id} className="mb-6 border-t border-hairline pt-4">
       <h2 className="mb-2 font-serif text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -122,13 +149,17 @@ function Done({ text }: { text: string | null }) {
   ) : null
 }
 
-function AccountSettings() {
+function AccountSettings({ focus }: { focus?: 'two-step' }) {
   const profile = useAccount((s) => s.profile)
+  useEffect(() => {
+    if (focus) document.getElementById(focus)?.scrollIntoView()
+  }, [focus])
   if (!profile) return null
   return (
     <>
       <EmailSection email={profile.email} />
       <PasswordSection />
+      <TwoStepSection />
       <DevicesSection remember={profile.remember} />
       <RemindersSection />
       <DataSection />
@@ -260,6 +291,507 @@ function PasswordSection() {
         </button>
       </form>
     </Section>
+  )
+}
+
+/** Passkeys the server asks for after the password (decision 30). */
+function TwoStepSection() {
+  const [status, setStatus] = useState<TwoStepStatus | null>(null)
+  const [keys, setKeys] = useState<SignInPasskey[] | null>(null)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const load = () =>
+    Promise.all([twoStepStatus(), listSignInPasskeys()])
+      .then(([s, k]) => {
+        setStatus(s)
+        setKeys(k)
+      })
+      .catch((err: unknown) => setLoadError(message(err)))
+  useEffect(() => {
+    void load()
+  }, [])
+  const on = status !== null && (status.passkeys > 0 || status.totp !== null)
+  return (
+    <Section title="Two-step sign-in" id="two-step">
+      {status?.resetDueAt && (
+        <PendingReset due={status.resetDueAt} reload={load} />
+      )}
+      <p className="mb-3 text-sm text-text-secondary">
+        When you sign in on a new device, Dayrule asks for a passkey or a code
+        from an authenticator app after your password, so a stolen password
+        isn’t enough. Your recovery phrase still works without either.
+      </p>
+      <ErrorText error={loadError} />
+      {passkeysAvailable() && keys && status && (
+        <SignInPasskeys
+          keys={keys}
+          totpOn={status.totp !== null}
+          reload={load}
+        />
+      )}
+      {status && (
+        <AuthenticatorApp
+          totp={status.totp}
+          passkeys={status.passkeys}
+          reload={load}
+        />
+      )}
+      {status && on && <BackupCodes left={status.backupCodes} reload={load} />}
+    </Section>
+  )
+}
+
+/** A reset by email is waiting (PLAN.md §10.2): say when, and offer to stop it. */
+function PendingReset({
+  due,
+  reload,
+}: {
+  due: string
+  reload: () => Promise<void>
+}) {
+  const f = useForm()
+  return (
+    <form
+      aria-label="Pending reset"
+      className="mb-4 rounded-[6px] border border-hairline p-3 text-sm"
+      onSubmit={f.run(async () => {
+        await cancelTwoStepReset()
+        await reload()
+      })}
+    >
+      <ErrorText error={f.error} />
+      <p className="mb-2">
+        Someone with your password asked by email to turn off two-step sign-in.
+        It happens on {resetDate(due)} unless you cancel it. If it wasn’t you,
+        cancel it and change your password.
+      </p>
+      <button type="submit" disabled={f.busy} className={button}>
+        Cancel the reset
+      </button>
+    </form>
+  )
+}
+
+function SubHeading({ children }: { children: ReactNode }) {
+  return <h3 className="mt-4 mb-2 text-sm font-semibold">{children}</h3>
+}
+
+const linkButton = 'text-sm text-accent hover:underline'
+
+function SignInPasskeys({
+  keys,
+  totpOn,
+  reload,
+}: {
+  keys: SignInPasskey[]
+  totpOn: boolean
+  reload: () => Promise<void>
+}) {
+  const [name, setName] = useState('')
+  const [password, setPassword] = useState('')
+  const [adding, setAdding] = useState(false)
+  const [removing, setRemoving] = useState<string | null>(null)
+  const [removePassword, setRemovePassword] = useState('')
+  const f = useForm()
+  const here = window.location.hostname // the RP ID: no port
+  return (
+    <>
+      <SubHeading>Passkeys</SubHeading>
+      <ErrorText error={f.error} />
+      <Done text={f.done} />
+      {keys.length > 0 && (
+        <ul className="mb-3 divide-y divide-hairline text-sm">
+          {keys.map((k) => (
+            <li key={k.id} className="py-2">
+              <div className="flex items-center gap-3">
+                <span className="flex-1">
+                  {k.label}
+                  <span className="block text-xs text-text-secondary">
+                    {k.site !== here && `Works on ${k.site}. `}
+                    {k.lastUsedAt
+                      ? `Last used ${formatDisplayDate(toLocalDate(new Date(k.lastUsedAt)))}`
+                      : 'Not used yet'}
+                  </span>
+                </span>
+                {removing !== k.id && (
+                  <button
+                    type="button"
+                    className="text-accent hover:underline"
+                    onClick={() => {
+                      setRemoving(k.id)
+                      setRemovePassword('')
+                    }}
+                  >
+                    Remove
+                  </button>
+                )}
+              </div>
+              {removing === k.id && (
+                <form
+                  className="mt-2"
+                  aria-label={`Remove ${k.label}`}
+                  onSubmit={f.run(async () => {
+                    await removeSignInPasskey(k.id, removePassword)
+                    setRemoving(null)
+                    await reload()
+                    return keys.length > 1 || totpOn
+                      ? 'Passkey removed.'
+                      : 'Passkey removed. Signing in now needs only your password.'
+                  })}
+                >
+                  <Field
+                    label="Password"
+                    type="password"
+                    autoComplete="current-password"
+                    required
+                    value={removePassword}
+                    onChange={(e) => setRemovePassword(e.target.value)}
+                  />
+                  <div className="flex gap-3">
+                    <button type="submit" disabled={f.busy} className={button}>
+                      Remove passkey
+                    </button>
+                    <button
+                      type="button"
+                      className={linkButton}
+                      onClick={() => setRemoving(null)}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+      {removing === null && !adding && (
+        <button
+          type="button"
+          className={button}
+          onClick={() => {
+            setName('')
+            setPassword('')
+            setAdding(true)
+          }}
+        >
+          Add a passkey
+        </button>
+      )}
+      {removing === null && adding && (
+        <form
+          aria-label="Add a sign-in passkey"
+          onSubmit={f.run(async () => {
+            await addSignInPasskey(name.trim() || deviceLabel(), password)
+            setAdding(false)
+            await reload()
+            return 'Passkey added. Signing in on a new device now needs it too.'
+          })}
+        >
+          <Field
+            label="Name (optional)"
+            value={name}
+            placeholder={deviceLabel()}
+            onChange={(e) => setName(e.target.value)}
+          />
+          <Field
+            label="Password"
+            type="password"
+            autoComplete="current-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
+          <div className="flex gap-3">
+            <button type="submit" disabled={f.busy} className={button}>
+              Add passkey
+            </button>
+            <button
+              type="button"
+              className={linkButton}
+              onClick={() => setAdding(false)}
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </>
+  )
+}
+
+type AppStep =
+  | { kind: 'idle' }
+  | { kind: 'password' }
+  | { kind: 'scan'; secret: string; uri: string }
+  | { kind: 'remove' }
+
+/** TOTP (decision 30): for people without passkeys, or as well as them. */
+function AuthenticatorApp({
+  totp,
+  passkeys,
+  reload,
+}: {
+  totp: TwoStepStatus['totp']
+  passkeys: number
+  reload: () => Promise<void>
+}) {
+  const [step, setStep] = useState<AppStep>({ kind: 'idle' })
+  const [password, setPassword] = useState('')
+  const [code, setCode] = useState('')
+  const f = useForm()
+  const cancel = (
+    <button
+      type="button"
+      className={linkButton}
+      onClick={() => setStep({ kind: 'idle' })}
+    >
+      Cancel
+    </button>
+  )
+  const passwordField = (
+    <Field
+      label="Password"
+      type="password"
+      autoComplete="current-password"
+      required
+      value={password}
+      onChange={(e) => setPassword(e.target.value)}
+    />
+  )
+  return (
+    <>
+      <SubHeading>Authenticator app</SubHeading>
+      <ErrorText error={f.error} />
+      <Done text={f.done} />
+      {totp && step.kind !== 'remove' && (
+        <div className="mb-3 flex items-center gap-3 text-sm">
+          <span className="flex-1">
+            On
+            <span className="block text-xs text-text-secondary">
+              {totp.lastUsedAt
+                ? `Last used ${formatDisplayDate(toLocalDate(new Date(totp.lastUsedAt)))}`
+                : 'Not used yet'}
+            </span>
+          </span>
+          <button
+            type="button"
+            className="text-accent hover:underline"
+            onClick={() => {
+              setPassword('')
+              setStep({ kind: 'remove' })
+            }}
+          >
+            Remove app
+          </button>
+        </div>
+      )}
+      {totp && step.kind === 'remove' && (
+        <form
+          aria-label="Remove the authenticator app"
+          onSubmit={f.run(async () => {
+            await removeTotp(password)
+            setStep({ kind: 'idle' })
+            await reload()
+            return passkeys > 0
+              ? 'Authenticator app removed.'
+              : 'Authenticator app removed. Signing in now needs only your password.'
+          })}
+        >
+          {passwordField}
+          <div className="flex gap-3">
+            <button type="submit" disabled={f.busy} className={button}>
+              Remove app
+            </button>
+            {cancel}
+          </div>
+        </form>
+      )}
+      {!totp && step.kind === 'idle' && (
+        <>
+          <p className="mb-3 text-sm text-text-secondary">
+            Use an app such as 1Password, Google Authenticator or your phone’s
+            password manager to make a new code every 30 seconds.
+          </p>
+          <button
+            type="button"
+            className={button}
+            onClick={() => {
+              setPassword('')
+              setStep({ kind: 'password' })
+            }}
+          >
+            Set up an authenticator app
+          </button>
+        </>
+      )}
+      {!totp && step.kind === 'password' && (
+        <form
+          aria-label="Set up an authenticator app"
+          onSubmit={f.run(async () => {
+            const { secret, uri } = await startTotp(password)
+            setPassword('')
+            setCode('')
+            setStep({ kind: 'scan', secret, uri })
+          })}
+        >
+          {passwordField}
+          <div className="flex gap-3">
+            <button type="submit" disabled={f.busy} className={button}>
+              Continue
+            </button>
+            {cancel}
+          </div>
+        </form>
+      )}
+      {!totp && step.kind === 'scan' && (
+        <form
+          aria-label="Confirm the authenticator app"
+          onSubmit={f.run(async () => {
+            await confirmTotp(code)
+            setStep({ kind: 'idle' })
+            await reload()
+            return 'Authenticator app added. Signing in on a new device now needs a code from it.'
+          })}
+        >
+          <p className="mb-3 text-sm text-text-secondary">
+            Scan this with your authenticator app, or enter the key by hand.
+            Then type the code it shows.
+          </p>
+          <QrCode text={step.uri} label="QR code for your authenticator app" />
+          <p className="mt-2 mb-3 text-sm">
+            Key:{' '}
+            <code
+              data-testid="totp-secret"
+              className="font-mono break-all select-all"
+            >
+              {step.secret.replace(/(.{4})(?=.)/g, '$1 ')}
+            </code>
+          </p>
+          <Field
+            label="Code from the app"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <div className="flex gap-3">
+            <button type="submit" disabled={f.busy} className={button}>
+              Turn on
+            </button>
+            {cancel}
+          </div>
+        </form>
+      )}
+    </>
+  )
+}
+
+/** Single-use codes for when the passkey and the phone are both lost. */
+function BackupCodes({
+  left,
+  reload,
+}: {
+  left: number
+  reload: () => Promise<void>
+}) {
+  const [asking, setAsking] = useState(false)
+  const [password, setPassword] = useState('')
+  const [codes, setCodes] = useState<string[] | null>(null)
+  const f = useForm()
+  return (
+    <>
+      <SubHeading>Backup codes</SubHeading>
+      <ErrorText error={f.error} />
+      {codes ? (
+        <>
+          <p className="mb-3 text-sm text-text-secondary">
+            Each code signs in once instead of a passkey or app code. Keep them
+            somewhere safe; they won’t be shown again.
+          </p>
+          <ol
+            aria-label="Backup codes"
+            className="mb-3 grid grid-cols-2 gap-x-4 gap-y-1 rounded-[6px] border border-hairline bg-sidebar/50 p-3 font-mono text-sm"
+          >
+            {codes.map((c) => (
+              <li key={c}>{c}</li>
+            ))}
+          </ol>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              className={button}
+              onClick={() =>
+                download(
+                  'dayrule-backup-codes.txt',
+                  'text/plain',
+                  `Dayrule backup codes\n\n${codes.join('\n')}\n\nEach code works once.\n`,
+                )
+              }
+            >
+              Download
+            </button>
+            <button
+              type="button"
+              className={linkButton}
+              onClick={() => setCodes(null)}
+            >
+              I’ve saved them
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p className="mb-3 text-sm text-text-secondary">
+            {left > 0
+              ? `${left} unused. Making new ones stops the old ones working.`
+              : 'None yet. Make some so you can still sign in if you lose your passkeys and your phone.'}
+          </p>
+          {asking ? (
+            <form
+              aria-label="Make backup codes"
+              onSubmit={f.run(async () => {
+                setCodes(await makeBackupCodes(password))
+                setAsking(false)
+                await reload()
+              })}
+            >
+              <Field
+                label="Password"
+                type="password"
+                autoComplete="current-password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+              />
+              <div className="flex gap-3">
+                <button type="submit" disabled={f.busy} className={button}>
+                  Make codes
+                </button>
+                <button
+                  type="button"
+                  className={linkButton}
+                  onClick={() => setAsking(false)}
+                >
+                  Cancel
+                </button>
+              </div>
+            </form>
+          ) : (
+            <button
+              type="button"
+              className={button}
+              onClick={() => {
+                setPassword('')
+                setAsking(true)
+              }}
+            >
+              {left > 0 ? 'Make new backup codes' : 'Make backup codes'}
+            </button>
+          )}
+        </>
+      )}
+    </>
   )
 }
 
