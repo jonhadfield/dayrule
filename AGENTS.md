@@ -37,6 +37,9 @@ From `server/`:
 - `go run ./cmd/migrate status|up|down` — needs `DATABASE_URL_UNPOOLED`.
 - `go run ./cmd/invite [n]` — prints n single-use invite codes; needs only
   that environment's `DATABASE_URL_UNPOOLED` (invites are stored as SHA-256).
+- `go run ./cmd/plaintext-check needle…` — lists the `table.column`s where
+  any needle appears (also inside base64); used by `web/e2e/no-plaintext.e2e.ts`.
+  Needs `DATABASE_URL_UNPOOLED`.
 - Integration tests need `TEST_DATABASE_URL`. Locally:
   `docker run --rm -d --name dayrule-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=dayrule_test postgres:18`
   then `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/dayrule_test?sslmode=disable go test ./...`.
@@ -76,7 +79,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 - 256-bit symmetric keys only; no classical-only public-key crypto protecting
   user data (PLAN.md §10.8).
 - No third-party scripts, analytics or trackers; the CSP in `vercel.json`
-  enforces `'self'` only.
+  enforces `'self'` only. The one exception is `connect-src
+  https://api.pwnedpasswords.com` for the breached-password check
+  (decision 31); don't add others.
 - Never test Firewall rate limits from the owner's connection against production: a block applies to that IP for the whole site. Firewall rules must not use persistent actions (`actionDuration`).
 - Never write secrets into code, docs, commits or PR text. Use env var names
   (`DATABASE_URL`, `RESEND_API_KEY`, …). Get values with `vercel env pull`

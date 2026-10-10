@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
 
 const OUT = new URL('./.out/', import.meta.url)
-const PASSWORD = 'orange kettle drift'
+export const PASSWORD = 'orange kettle drift'
 
 function newInvite(): string {
   return execFileSync(new URL('invite', OUT).pathname, ['1'], {
@@ -32,7 +32,23 @@ async function emailCode(email: string): Promise<string> {
   return code!
 }
 
-export async function signUp(page: Page, email: string) {
+/**
+ * Answers the breached-password check (decision 31) locally, so tests never
+ * call the real Pwned Passwords API. Nothing is breached unless listed as
+ * SHA-1 suffixes (characters 6–40, uppercase).
+ */
+export async function stubBreachCheck(page: Page, breached: string[] = []) {
+  await page.route('https://api.pwnedpasswords.com/range/*', (route) =>
+    route.fulfill({
+      headers: { 'access-control-allow-origin': '*' },
+      body: breached.map((s) => `${s}:3`).join('\r\n'),
+    }),
+  )
+}
+
+/** Signs up through the UI and returns the 24-word recovery phrase. */
+export async function signUp(page: Page, email: string): Promise<string[]> {
+  await stubBreachCheck(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
   await page.getByLabel('Invite code').fill(newInvite())
@@ -66,6 +82,7 @@ export async function signUp(page: Page, email: string) {
   await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible({
     timeout: 30_000,
   })
+  return words
 }
 
 async function labelOf(box: ReturnType<Page['getByRole']>): Promise<string> {
@@ -74,10 +91,10 @@ async function labelOf(box: ReturnType<Page['getByRole']>): Promise<string> {
   return text.replace(/\D/g, '')
 }
 
-export async function signIn(page: Page, email: string) {
+export async function signIn(page: Page, email: string, password = PASSWORD) {
   await page.goto('/')
   await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByLabel('Password').fill(password)
   await page.getByRole('button', { name: 'Sign in' }).click()
   // The sidebar on desktop, the lists screen on mobile.
   await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible({

@@ -32,6 +32,8 @@ function directives(csp: string): Map<string, string[]> {
   )
 }
 
+const PWNED = 'https://api.pwnedpasswords.com'
+
 describe('security headers', () => {
   const csp = directives(header('Content-Security-Policy'))
 
@@ -41,15 +43,20 @@ describe('security headers', () => {
     for (const [name, values] of csp) {
       expect(values, name).not.toContain("'unsafe-inline'")
       expect(values, name).not.toContain("'unsafe-eval'")
+      // The one third-party origin: the breached-password check's data
+      // fetch (decision 31), allowed only in connect-src.
+      const allowed = name === 'connect-src' ? [PWNED] : []
       expect(
-        values.some((v) => v === '*' || v.startsWith('http')),
+        values.some(
+          (v) => v === '*' || (v.startsWith('http') && !allowed.includes(v)),
+        ),
         name,
       ).toBe(false)
     }
   })
 
   it('locks down everything else', () => {
-    expect(csp.get('connect-src')).toEqual(["'self'"])
+    expect(csp.get('connect-src')).toEqual(["'self'", PWNED])
     expect(csp.get('object-src')).toEqual(["'none'"])
     expect(csp.get('base-uri')).toEqual(["'none'"])
     expect(csp.get('frame-ancestors')).toEqual(["'none'"])
