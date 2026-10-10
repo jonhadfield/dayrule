@@ -15,6 +15,7 @@ import {
   type SecondStep,
 } from './session'
 import { unlockWithPasskey } from './passkey'
+import { confirmTwoStepReset, resetDate, startTwoStepReset } from './twostep'
 import { AuthShell, ErrorText, Field, LinkButton, Remember, Submit } from './ui'
 import { message, newPasswordProblem } from './validation'
 
@@ -130,7 +131,20 @@ function SecondStepScreen({
   const totp = step.methods.includes('totp')
   const backup = step.methods.includes('backup')
   const [code, setCode] = useState('')
+  const [help, setHelp] = useState(false)
+  const [resetDueAt, setResetDueAt] = useState(step.resetDueAt ?? null)
   const { busy, error, run } = useSubmit()
+  if (help)
+    return (
+      <ResetByEmail
+        token={step.token}
+        email={email}
+        due={resetDueAt}
+        onDue={setResetDueAt}
+        onRecover={onRecover}
+        onBack={() => setHelp(false)}
+      />
+    )
   const codeLabel = totp
     ? backup
       ? 'Code from your authenticator app, or a backup code'
@@ -142,6 +156,12 @@ function SecondStepScreen({
       subtitle="Your account asks for a second step as well as your password when you sign in on a new device."
     >
       <ErrorText error={error} />
+      {resetDueAt && (
+        <p className="mb-4 rounded-[6px] border border-hairline p-3 text-sm">
+          Two-step sign-in is set to turn off on {resetDate(resetDueAt)}, as
+          asked by email. Signing in with your second step cancels that.
+        </p>
+      )}
       {passkey && (
         <form onSubmit={run(() => signInWithPasskey(step, email, remember))}>
           <Submit busy={busy}>Use passkey</Submit>
@@ -185,11 +205,92 @@ function SecondStepScreen({
         <LinkButton onClick={() => window.location.assign('/')}>
           Start again
         </LinkButton>
-        <LinkButton onClick={onRecover}>
+        <LinkButton onClick={() => setHelp(true)}>
           {passkey && !totp && !backup
             ? 'Lost your passkey?'
             : 'Can’t use any of these?'}
         </LinkButton>
+      </div>
+    </AuthShell>
+  )
+}
+
+/**
+ * No second step to hand (PLAN.md §10.2): the recovery phrase signs in
+ * without one, or an emailed code turns two-step sign-in off after 7 days.
+ */
+function ResetByEmail({
+  token,
+  email,
+  due,
+  onDue,
+  onRecover,
+  onBack,
+}: {
+  token: string
+  email: string
+  /** When a pending reset takes effect, if there is one. */
+  due: string | null
+  onDue: (due: string) => void
+  onRecover: () => void
+  onBack: () => void
+}) {
+  const [sent, setSent] = useState(false)
+  const [code, setCode] = useState('')
+  const { busy, error, run } = useSubmit()
+  return (
+    <AuthShell title="Can’t use your second step?">
+      <p className="mb-3 text-sm">
+        Your 24-word recovery phrase signs you in without a second step, and
+        lets you set a new password.
+      </p>
+      <LinkButton onClick={onRecover}>Use your recovery phrase</LinkButton>
+      <h2 className="mt-6 mb-2 font-serif text-lg font-semibold">
+        No recovery phrase either?
+      </h2>
+      <ErrorText error={error} />
+      {due ? (
+        <p role="status" className="mb-3 text-sm text-ready">
+          Two-step sign-in will be turned off on {resetDate(due)}. From then,
+          your password alone signs in. We’ll email {email} before it happens.
+        </p>
+      ) : sent ? (
+        <form
+          aria-label="Confirm turning off two-step sign-in"
+          onSubmit={run(async () =>
+            onDue(await confirmTwoStepReset(email, code)),
+          )}
+        >
+          <Field
+            label="Code from the email"
+            autoComplete="one-time-code"
+            inputMode="numeric"
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          <Submit busy={busy}>Turn off in 7 days</Submit>
+        </form>
+      ) : (
+        <form
+          onSubmit={run(async () => {
+            const pending = await startTwoStepReset(token)
+            if (pending) onDue(pending)
+            else setSent(true)
+          })}
+        >
+          <p className="mb-3 text-sm text-text-secondary">
+            We can turn off two-step sign-in with a code emailed to {email}. It
+            takes 7 days, so that if someone else has your password, you have
+            time to stop them: we email you throughout, and signing in with your
+            second step cancels it. Your to-dos stay encrypted with your
+            password all along.
+          </p>
+          <Submit busy={busy}>Email me a code</Submit>
+        </form>
+      )}
+      <div className="mt-5">
+        <LinkButton onClick={onBack}>Back</LinkButton>
       </div>
     </AuthShell>
   )

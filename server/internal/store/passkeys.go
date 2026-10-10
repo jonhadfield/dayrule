@@ -195,6 +195,18 @@ func (p Passkeys) CeremonyUser(ctx context.Context, tokenHash []byte, purpose st
 	return id, err
 }
 
+// LiveCeremony returns the user of a ceremony that hasn't expired, however
+// many challenges or codes it has had.
+func (p Passkeys) LiveCeremony(ctx context.Context, tokenHash []byte, purpose string, now time.Time) (uuid.UUID, error) {
+	var id uuid.UUID
+	err := p.Pool.QueryRow(ctx, `SELECT user_id FROM webauthn_ceremonies
+		WHERE token_hash = $1 AND purpose = $2 AND expires_at > $3`, tokenHash, purpose, now).Scan(&id)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return uuid.Nil, ErrNotFound
+	}
+	return id, err
+}
+
 // IssueChallenge attaches a new challenge to a live ceremony, replacing any
 // earlier one. Each ceremony gets at most maxChallenges; after that, and
 // once it has expired, it is ErrNotFound.

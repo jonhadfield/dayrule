@@ -2,7 +2,6 @@
 // §10.2, decision 30), against the real API. The test computes the app's
 // codes itself (RFC 6238).
 
-import { createHmac } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
 import {
   add,
@@ -11,25 +10,8 @@ import {
   PASSWORD,
   signOut,
   signUp,
+  totp,
 } from './helpers'
-
-function base32(s: string): Buffer {
-  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
-  let bits = ''
-  for (const c of s) bits += alphabet.indexOf(c).toString(2).padStart(5, '0')
-  const bytes = bits.match(/.{8}/g) ?? []
-  return Buffer.from(bytes.map((b) => parseInt(b, 2)))
-}
-
-/** The code an authenticator app shows, `ahead` 30-second steps from now. */
-function totp(secret: string, ahead = 0): string {
-  const step = Math.floor(Date.now() / 30_000) + ahead
-  const msg = Buffer.alloc(8)
-  msg.writeBigUInt64BE(BigInt(step))
-  const sum = createHmac('sha1', base32(secret)).update(msg).digest()
-  const n = sum.readUInt32BE(sum[19]! & 0x0f) & 0x7fffffff
-  return String(n % 1_000_000).padStart(6, '0')
-}
 
 const inbox = (page: Page) => page.getByRole('link', { name: 'Inbox' })
 

@@ -22,11 +22,14 @@ export type AccountStatus = 'loading' | 'signed-out' | 'locked' | 'unlocked'
 interface AccountState {
   status: AccountStatus
   profile: Profile | null
+  /** Just signed up: suggest a second step for sign-in (decision 30). */
+  suggestTwoStep: boolean
 }
 
 export const useAccount = create<AccountState>(() => ({
   status: 'loading',
   profile: null,
+  suggestTwoStep: false,
 }))
 
 const set = (s: Partial<AccountState>) => useAccount.setState(s)
@@ -116,6 +119,7 @@ export async function register(
     recoveryProof: pending.recoveryProof,
     deviceLabel: deviceLabel(),
   })
+  set({ suggestTwoStep: true })
   await finishUnlock(
     {
       userId: pending.userId,
@@ -136,6 +140,8 @@ export async function register(
 export interface SecondStep {
   token: string
   methods: string[]
+  /** When a reset by email will turn two-step sign-in off, if one is pending. */
+  resetDueAt?: string | null
 }
 
 interface LoginResponse {
@@ -333,6 +339,10 @@ export async function lock(): Promise<void> {
  * Sign out: end the server session and forget this device. The encrypted
  * data is kept: until sync (M4) it's the only copy of the to-dos.
  */
+export function dismissTwoStepSuggestion(): void {
+  set({ suggestTwoStep: false })
+}
+
 export async function signOut(): Promise<void> {
   const profile = useAccount.getState().profile
   await api('POST', '/auth/logout').catch(() => undefined)

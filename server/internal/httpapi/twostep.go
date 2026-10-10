@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"context"
 	"errors"
 	"net/http"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -22,6 +24,11 @@ const (
 	maxCodeAttempts = 5
 	// totpSetupAttempts caps the wrong codes while setting TOTP up.
 	totpSetupAttempts = 5
+	// resetWait is how long a reset by email waits before it takes effect,
+	// with notices to the account address, so the owner can stop it.
+	resetWait = 7 * 24 * time.Hour
+	// resetPurpose is the email code purpose for asking for a reset.
+	resetPurpose = "two_step_reset"
 )
 
 var (
@@ -32,6 +39,9 @@ var (
 
 func (a *Accounts) twoStepRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /api/v1/auth/login/code", a.loginCode)
+	mux.HandleFunc("POST /api/v1/auth/login/reset/start", a.resetStart)
+	mux.HandleFunc("POST /api/v1/auth/login/reset/confirm", a.resetConfirm)
+	mux.HandleFunc("DELETE /api/v1/account/two-step/reset", a.withSession(a.resetCancel))
 	mux.HandleFunc("GET /api/v1/account/two-step", a.withSession(a.twoStepStatus))
 	mux.HandleFunc("POST /api/v1/account/totp/start", a.withSession(a.totpStart))
 	mux.HandleFunc("POST /api/v1/account/totp", a.withSession(a.totpConfirm))
@@ -83,7 +93,164 @@ func (a *Accounts) startSecondStep(w http.ResponseWriter, r *http.Request, userI
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]any{"secondStep": map[string]any{"token": token, "methods": methods}})
+	reset, err := a.twoStep().PendingReset(r.Context(), userID)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"secondStep": map[string]any{
+		"token": token, "methods": methods, "resetDueAt": reset,
+	}})
+}
+
+// cancelPendingReset cancels a reset by email, with a notice. It runs when
+// a passkey or code finishes a sign-in (the owner has a second step after
+// all) and when the password changes (the reset was asked for with the old
+// one).
+func (a *Accounts) cancelPendingReset(ctx context.Context, u *store.User) error {
+	cancelled, err := a.twoStep().CancelReset(ctx, u.ID)
+	if cancelled {
+		a.send(ctx, email.TwoStepResetCancelled(u.Email))
+	}
+	return err
+}
+
+// completeDueReset turns two-step sign-in off if a reset by email is due,
+// at a sign-in whose password was just checked.
+func (a *Accounts) completeDueReset(ctx context.Context, u *store.User) (bool, error) {
+	done, err := a.twoStep().CompleteReset(ctx, u.ID, a.Now())
+	if done {
+		a.send(ctx, email.TwoStepResetDone(u.Email))
+	}
+	return done, err
+}
+
+// ---------------------------------------------------------------------------
+// Turning two-step sign-in off by email (PLAN.md §10.2): for someone who
+// has their password but none of their second steps or backup codes. Email
+// access alone never decrypts anything, and the wait gives the owner a week
+// of notices to stop it.
+
+// resetStart emails a code to the account address. The token from the
+// password step shows the password was right.
+func (a *Accounts) resetStart(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Token string `json:"token"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	userID, err := a.ceremonies().LiveCeremony(r.Context(), auth.TokenHash(req.Token), store.CeremonyLogin, a.Now())
+	if err != nil {
+		writeErr(w, ceremonyErr(err))
+		return
+	}
+	u, err := a.Store.UserByID(r.Context(), userID)
+	if err != nil {
+		writeErr(w, ceremonyErr(err))
+		return
+	}
+	if due, err := a.twoStep().PendingReset(r.Context(), u.ID); err != nil || due != nil {
+		if err != nil {
+			writeErr(w, err)
+		} else {
+			writeJSON(w, http.StatusOK, map[string]any{"resetDueAt": due})
+		}
+		return
+	}
+	now := a.Now()
+	recent, err := a.Store.RecentCodes(r.Context(), u.Email, resetPurpose, now.Add(-time.Hour))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if recent >= 3 {
+		writeErr(w, apiError{http.StatusTooManyRequests, "too_many_codes", "Too many codes sent. Try again in an hour."})
+		return
+	}
+	code, err := auth.NewCode()
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := a.Store.CreateCode(r.Context(), u.Email, resetPurpose, &u.ID,
+		a.Keys.CodeHash(u.Email, resetPurpose, code), now.Add(codeLifetime)); err != nil {
+		writeErr(w, err)
+		return
+	}
+	a.send(r.Context(), email.TwoStepResetCode(u.Email, code))
+	writeJSON(w, http.StatusAccepted, map[string]bool{"sent": true})
+}
+
+// resetConfirm takes the emailed code and starts the wait. The code was
+// only sent after the password, so it stands for both.
+func (a *Accounts) resetConfirm(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email string `json:"email"`
+		Code  string `json:"code"`
+	}
+	if err := decode(r, &req); err != nil {
+		writeErr(w, err)
+		return
+	}
+	addr, err := normEmail(req.Email)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	userID, err := a.checkCode(r, addr, resetPurpose, req.Code, nil)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if userID == nil {
+		writeErr(w, errExpiredCode)
+		return
+	}
+	u, err := a.Store.UserByID(r.Context(), *userID)
+	if err != nil {
+		writeErr(w, errExpiredCode)
+		return
+	}
+	now := a.Now()
+	due, created, err := a.twoStep().RequestReset(r.Context(), u.ID, now, now.Add(resetWait))
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if created {
+		a.send(r.Context(), email.TwoStepResetRequested(u.Email, due))
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"resetDueAt": due})
+}
+
+func (a *Accounts) resetCancel(w http.ResponseWriter, r *http.Request) {
+	u, _, ok := a.currentUser(w, r)
+	if !ok {
+		return
+	}
+	cancelled, err := a.twoStep().CancelReset(r.Context(), u.ID)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if !cancelled {
+		writeErr(w, apiError{http.StatusNotFound, "not_found", "Nothing is waiting to be turned off."})
+		return
+	}
+	a.send(r.Context(), email.TwoStepResetCancelled(u.Email))
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// RemindResets warns the accounts whose reset is due within a day. It runs
+// from the daily cron job.
+func (a *Accounts) RemindResets(ctx context.Context) (int, error) {
+	due, err := a.twoStep().ResetsDueSoon(ctx, a.Now(), 24*time.Hour)
+	for _, n := range due {
+		a.send(ctx, email.TwoStepResetSoon(n.Email, n.DueAt))
+	}
+	return len(due), err
 }
 
 // loginCode finishes a sign-in with a code from an authenticator app or a
@@ -131,6 +298,10 @@ func (a *Accounts) loginCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := ts.SecondStepPassed(r.Context(), u.ID); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := a.cancelPendingReset(r.Context(), u); err != nil {
 		writeErr(w, err)
 		return
 	}
@@ -195,7 +366,12 @@ func (a *Accounts) twoStepStatus(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	out := map[string]any{"passkeys": m.Passkeys, "totp": nil, "backupCodes": m.BackupCodes}
+	reset, err := ts.PendingReset(r.Context(), userID)
+	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	out := map[string]any{"passkeys": m.Passkeys, "totp": nil, "backupCodes": m.BackupCodes, "resetDueAt": reset}
 	if m.TOTP {
 		t, err := ts.TOTP(r.Context(), userID)
 		if err != nil {

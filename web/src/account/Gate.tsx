@@ -4,6 +4,7 @@ import { StoreProvider } from '../app/StoreProvider'
 import type { EntityStore } from '../store/store'
 import { Locked, SignedOut } from './screens'
 import { lock, resume, useAccount } from './session'
+import { TwoStepPrompt } from './TwoStepPrompt'
 import { message } from './validation'
 
 const AUTO_LOCK_MS = 15 * 60 * 1000 // decision 7
@@ -67,7 +68,12 @@ function Unlocked({
 
   if (error) return <p className="p-6">{error}</p>
   if (!store) return null
-  return <StoreProvider store={store}>{children}</StoreProvider>
+  return (
+    <StoreProvider store={store}>
+      {children}
+      <TwoStepPrompt />
+    </StoreProvider>
+  )
 }
 
 /** Lock after 15 minutes without input, unless "stay unlocked" is on. */

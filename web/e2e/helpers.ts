@@ -1,6 +1,7 @@
 // Shared steps for end-to-end tests: accounts and to-dos via the real UI.
 
 import { execFileSync } from 'node:child_process'
+import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
 
@@ -19,7 +20,7 @@ function newInvite(): string {
 }
 
 /** The latest code emailed to an address (logged by the API in tests). */
-async function emailCode(email: string): Promise<string> {
+export async function emailCode(email: string): Promise<string> {
   let code: string | undefined
   await expect
     .poll(() => {
@@ -46,8 +47,15 @@ export async function stubBreachCheck(page: Page, breached: string[] = []) {
   )
 }
 
-/** Signs up through the UI and returns the 24-word recovery phrase. */
-export async function signUp(page: Page, email: string): Promise<string[]> {
+/**
+ * Signs up through the UI and returns the 24-word recovery phrase. The
+ * suggestion to add a second step is dismissed unless keepPrompt is set.
+ */
+export async function signUp(
+  page: Page,
+  email: string,
+  { keepPrompt = false } = {},
+): Promise<string[]> {
   await stubBreachCheck(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
@@ -78,6 +86,12 @@ export async function signUp(page: Page, email: string): Promise<string[]> {
     await box.fill(words[n - 1]!)
   }
   await page.getByRole('button', { name: 'Create account' }).click()
+  const prompt = page.getByRole('dialog', {
+    name: 'Add a second step to sign-in?',
+  })
+  await expect(prompt).toBeVisible({ timeout: 30_000 })
+  if (keepPrompt) return words
+  await prompt.getByRole('button', { name: 'Not now' }).click()
   // The sidebar on desktop, the lists screen on mobile.
   await expect(page.getByRole('link', { name: 'Inbox' })).toBeVisible({
     timeout: 30_000,
@@ -130,4 +144,22 @@ export async function enterPassword(page: Page, email: string) {
   await page.getByLabel('Email').fill(email)
   await page.getByLabel('Password').fill(PASSWORD)
   await page.getByRole('button', { name: 'Sign in' }).click()
+}
+
+function base32(s: string): Buffer {
+  const alphabet = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ234567'
+  let bits = ''
+  for (const c of s) bits += alphabet.indexOf(c).toString(2).padStart(5, '0')
+  const bytes = bits.match(/.{8}/g) ?? []
+  return Buffer.from(bytes.map((b) => parseInt(b, 2)))
+}
+
+/** The code an authenticator app shows, `ahead` 30-second steps from now. */
+export function totp(secret: string, ahead = 0): string {
+  const step = Math.floor(Date.now() / 30_000) + ahead
+  const msg = Buffer.alloc(8)
+  msg.writeBigUInt64BE(BigInt(step))
+  const sum = createHmac('sha1', base32(secret)).update(msg).digest()
+  const n = sum.readUInt32BE(sum[19]! & 0x0f) & 0x7fffffff
+  return String(n % 1_000_000).padStart(6, '0')
 }

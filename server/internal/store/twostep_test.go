@@ -157,3 +157,71 @@ func TestSecondStepLockout(t *testing.T) {
 		t.Error("still locked after a pass")
 	}
 }
+
+func TestTwoStepReset(t *testing.T) {
+	pool := testdb.New(t)
+	ctx := context.Background()
+	ts := store.TwoStep{Accounts: store.Accounts{Pool: pool}}
+	p := store.Passkeys(ts)
+	alice := newUser(t, pool)
+	now := time.Date(2026, 10, 10, 9, 0, 0, 0, time.UTC)
+	week := now.Add(7 * 24 * time.Hour)
+
+	if err := p.Add(ctx, alice, passkey(1), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.StartTOTP(ctx, alice, []byte("sealed"), now); err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.ConfirmTOTP(ctx, alice, 1, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := ts.ReplaceBackupCodes(ctx, alice, [][]byte{[]byte("c1")}); err != nil {
+		t.Fatal(err)
+	}
+
+	due, created, err := ts.RequestReset(ctx, alice, now, week)
+	if err != nil || !created || !due.Equal(week) {
+		t.Fatalf("request = %v %v %v", due, created, err)
+	}
+	// Asking again keeps the first date.
+	if due, created, _ := ts.RequestReset(ctx, alice, now.Add(time.Hour), week.Add(time.Hour)); created || !due.Equal(week) {
+		t.Errorf("again = %v %v", due, created)
+	}
+	if at, _ := ts.PendingReset(ctx, alice); at == nil || !at.Equal(week) {
+		t.Errorf("pending = %v", at)
+	}
+
+	if n, _ := ts.ResetsDueSoon(ctx, week.Add(-25*time.Hour), 24*time.Hour); len(n) != 0 {
+		t.Errorf("warned two days early: %v", n)
+	}
+	if n, err := ts.ResetsDueSoon(ctx, week.Add(-time.Hour), 24*time.Hour); err != nil || len(n) != 1 || !n[0].DueAt.Equal(week) {
+		t.Errorf("warnings = %v %v", n, err)
+	}
+	if n, _ := ts.ResetsDueSoon(ctx, week.Add(-time.Minute), 24*time.Hour); len(n) != 0 {
+		t.Errorf("warned twice: %v", n)
+	}
+
+	if done, err := ts.CompleteReset(ctx, alice, week.Add(-time.Second)); err != nil || done {
+		t.Errorf("early = %v %v", done, err)
+	}
+	if done, err := ts.CompleteReset(ctx, alice, week); err != nil || !done {
+		t.Fatalf("due = %v %v", done, err)
+	}
+	if m, _ := ts.Methods(ctx, alice); m != (store.Methods{}) {
+		t.Errorf("methods after = %+v", m)
+	}
+	if at, _ := ts.PendingReset(ctx, alice); at != nil {
+		t.Errorf("still pending: %v", at)
+	}
+
+	t.Run("cancel", func(t *testing.T) {
+		_, _, _ = ts.RequestReset(ctx, alice, now, week)
+		if ok, err := ts.CancelReset(ctx, alice); err != nil || !ok {
+			t.Errorf("cancel = %v %v", ok, err)
+		}
+		if ok, _ := ts.CancelReset(ctx, alice); ok {
+			t.Error("cancelled twice")
+		}
+	})
+}

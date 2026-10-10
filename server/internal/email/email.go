@@ -151,6 +151,33 @@ func BackupCodeUsed(to string, left int) Message {
 		"A backup code was used to sign in to your Dayrule account. It won't work again; you have %d left. You can make new ones under Account.\n\nIf this wasn't you, use your 24-word recovery phrase to set a new password straight away.\n", left)}
 }
 
+// when formats a time for a notice. UTC, since the server doesn't know the
+// reader's time zone.
+func when(t time.Time) string { return t.UTC().Format("Monday 2 January 2006 at 15:04 UTC") }
+
+func TwoStepResetCode(to, code string) Message {
+	return Message{To: to, Subject: "Your Dayrule code: " + code, Text: fmt.Sprintf(
+		"Your code to turn off two-step sign-in on your Dayrule account is:\n\n    %s\n\nIt expires in 10 minutes. Entering it starts a 7-day wait; after that, your password alone will sign in.\n\nIf you didn't ask for this, someone knows your password: use your 24-word recovery phrase to set a new one straight away.\n", code)}
+}
+
+func TwoStepResetRequested(to string, due time.Time) Message {
+	return Message{To: to, Subject: "Two-step sign-in will be turned off in 7 days", Text: fmt.Sprintf(
+		"Someone who knew your password asked, by email, to turn off two-step sign-in on your Dayrule account. Unless it's cancelled, it happens on %s, and from then your password alone will sign in.\n\nTo cancel it, sign in with your passkey, authenticator app or a backup code, or cancel it under Account → Two-step sign-in. Changing your password cancels it too.\n\nIf this wasn't you, someone knows your password: use your 24-word recovery phrase to set a new one straight away.\n", when(due))}
+}
+
+func TwoStepResetSoon(to string, due time.Time) Message {
+	return Message{To: to, Subject: "Two-step sign-in will be turned off tomorrow", Text: fmt.Sprintf(
+		"Two-step sign-in on your Dayrule account will be turned off on %s, as asked by email a week ago. From then your password alone will sign in.\n\nTo cancel it, sign in with your passkey, authenticator app or a backup code, or cancel it under Account → Two-step sign-in. If this wasn't you, use your 24-word recovery phrase to set a new password straight away.\n", when(due))}
+}
+
+func TwoStepResetDone(to string) Message {
+	return Message{To: to, Subject: "Two-step sign-in was turned off", Text: "Two-step sign-in was turned off on your Dayrule account, as asked by email 7 days ago: its passkeys, authenticator app and backup codes were removed. Your password alone now signs in. You can set up a second step again under Account.\n\nIf this wasn't you, use your 24-word recovery phrase to set a new password straight away.\n"}
+}
+
+func TwoStepResetCancelled(to string) Message {
+	return Message{To: to, Subject: "Two-step sign-in will stay on", Text: "The request to turn off two-step sign-in on your Dayrule account was cancelled, so it stays on.\n"}
+}
+
 // Reminder says only that there is one, and when: the server can't know
 // what it's for (PLAN.md §10.5).
 func Reminder(to, localTime string) Message {

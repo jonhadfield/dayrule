@@ -71,6 +71,8 @@ export interface TwoStepStatus {
   passkeys: number
   totp: { addedAt: string; lastUsedAt: string | null } | null
   backupCodes: number
+  /** When a reset by email turns two-step sign-in off, if one is pending. */
+  resetDueAt: string | null
 }
 
 export function twoStepStatus(): Promise<TwoStepStatus> {
@@ -107,4 +109,47 @@ export async function makeBackupCodes(password: string): Promise<string[]> {
       currentAuthKey: await authKeyFor(password),
     })
   ).codes
+}
+
+// ---------------------------------------------------------------------------
+// Turning two-step sign-in off by email, after 7 days (PLAN.md §10.2): for
+// someone with their password but none of their second steps.
+
+/**
+ * Email a code to the account address. The token from the password step
+ * shows the password was right. Returns the date if a reset is already
+ * waiting (and no code is sent).
+ */
+export async function startTwoStepReset(token: string): Promise<string | null> {
+  const r = await api<{ resetDueAt?: string }>(
+    'POST',
+    '/auth/login/reset/start',
+    { token },
+  )
+  return r.resetDueAt ?? null
+}
+
+/** Confirm with the emailed code; returns when the reset takes effect. */
+export async function confirmTwoStepReset(
+  email: string,
+  code: string,
+): Promise<string> {
+  return (
+    await api<{ resetDueAt: string }>('POST', '/auth/login/reset/confirm', {
+      email,
+      code,
+    })
+  ).resetDueAt
+}
+
+export async function cancelTwoStepReset(): Promise<void> {
+  await api('DELETE', '/account/two-step/reset')
+}
+
+/** A reset date as people read it, in their own time zone. */
+export function resetDate(iso: string): string {
+  return new Date(iso).toLocaleString(undefined, {
+    dateStyle: 'full',
+    timeStyle: 'short',
+  })
 }

@@ -258,6 +258,10 @@ func (a *Accounts) loginPasskey(w http.ResponseWriter, r *http.Request) {
 			"This passkey may have been copied, so it can't be used. Use another passkey or your recovery phrase."})
 		return
 	}
+	if err := a.cancelPendingReset(r.Context(), u); err != nil {
+		writeErr(w, err)
+		return
+	}
 	if err := a.Passkeys.Store.EndCeremony(r.Context(), hash); err != nil {
 		writeErr(w, err)
 		return

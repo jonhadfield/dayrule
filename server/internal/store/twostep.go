@@ -183,3 +183,85 @@ func (t TwoStep) SecondStepPassed(ctx context.Context, userID uuid.UUID) error {
 		WHERE id = $1 AND second_step_failures > 0`, userID)
 	return err
 }
+
+// ---------------------------------------------------------------------------
+// Turning two-step sign-in off by email, after a wait
+
+// RequestReset schedules a reset unless one is already pending, and returns
+// when it is due and whether this call made it.
+func (t TwoStep) RequestReset(ctx context.Context, userID uuid.UUID, now, due time.Time) (time.Time, bool, error) {
+	tag, err := t.Pool.Exec(ctx, `INSERT INTO two_step_resets (user_id, requested_at, due_at) VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO NOTHING`, userID, now, due)
+	if err != nil {
+		return time.Time{}, false, err
+	}
+	var at time.Time
+	err = t.Pool.QueryRow(ctx, `SELECT due_at FROM two_step_resets WHERE user_id = $1`, userID).Scan(&at)
+	return at, tag.RowsAffected() == 1, err
+}
+
+// PendingReset returns when a pending reset is due, or nil.
+func (t TwoStep) PendingReset(ctx context.Context, userID uuid.UUID) (*time.Time, error) {
+	var at time.Time
+	err := t.Pool.QueryRow(ctx, `SELECT due_at FROM two_step_resets WHERE user_id = $1`, userID).Scan(&at)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &at, nil
+}
+
+// CancelReset removes a pending reset and reports whether there was one.
+func (t TwoStep) CancelReset(ctx context.Context, userID uuid.UUID) (bool, error) {
+	tag, err := t.Pool.Exec(ctx, `DELETE FROM two_step_resets WHERE user_id = $1`, userID)
+	return tag.RowsAffected() > 0, err
+}
+
+// CompleteReset carries out a reset that is due: every passkey, the TOTP
+// secret, the backup codes and any second step in progress go. It reports
+// whether one was due.
+func (t TwoStep) CompleteReset(ctx context.Context, userID uuid.UUID, now time.Time) (bool, error) {
+	tx, err := t.Pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+	tag, err := tx.Exec(ctx, `DELETE FROM two_step_resets WHERE user_id = $1 AND due_at <= $2`, userID, now)
+	if err != nil || tag.RowsAffected() == 0 {
+		return false, err
+	}
+	for _, q := range []string{
+		`DELETE FROM webauthn_credentials WHERE user_id = $1`,
+		`DELETE FROM totp_secrets WHERE user_id = $1`,
+		`DELETE FROM backup_codes WHERE user_id = $1`,
+		`DELETE FROM webauthn_ceremonies WHERE user_id = $1`,
+	} {
+		if _, err := tx.Exec(ctx, q, userID); err != nil {
+			return false, err
+		}
+	}
+	return true, tx.Commit(ctx)
+}
+
+// ResetNotice is a pending reset to warn an account about.
+type ResetNotice struct {
+	Email string
+	DueAt time.Time
+}
+
+// ResetsDueSoon marks and returns the pending resets due within the next
+// period that haven't had their warning yet.
+func (t TwoStep) ResetsDueSoon(ctx context.Context, now time.Time, within time.Duration) ([]ResetNotice, error) {
+	rows, err := t.Pool.Query(ctx, `UPDATE two_step_resets r SET reminded_at = $1 FROM users u
+		WHERE u.id = r.user_id AND r.reminded_at IS NULL AND r.due_at > $1 AND r.due_at <= $2
+		RETURNING u.email, r.due_at`, now, now.Add(within))
+	if err != nil {
+		return nil, err
+	}
+	return pgx.CollectRows(rows, func(r pgx.CollectableRow) (ResetNotice, error) {
+		var n ResetNotice
+		return n, r.Scan(&n.Email, &n.DueAt)
+	})
+}

@@ -494,13 +494,23 @@ func (a *Accounts) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	switch methods, err := a.secondStepMethods(r, u.ID); {
-	case err != nil:
+	methods, err := a.secondStepMethods(r, u.ID)
+	if err != nil {
 		writeErr(w, err)
 		return
-	case len(methods) > 0:
-		a.startSecondStep(w, r, u.ID, req.DeviceLabel, methods)
-		return
+	}
+	if len(methods) > 0 {
+		// A reset by email that has waited long enough takes effect now,
+		// with the password just checked.
+		reset, err := a.completeDueReset(r.Context(), u)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+		if !reset {
+			a.startSecondStep(w, r, u.ID, req.DeviceLabel, methods)
+			return
+		}
 	}
 	a.signedIn(w, r, u, req.DeviceLabel)
 }
@@ -596,6 +606,10 @@ func (a *Accounts) recoverComplete(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
+	if err := a.cancelPendingReset(r.Context(), u); err != nil {
+		writeErr(w, err)
+		return
+	}
 	if err := a.startSession(r.Context(), w, u.ID, req.DeviceLabel); err != nil {
 		writeErr(w, err)
 		return
@@ -648,6 +662,10 @@ func (a *Accounts) changePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := a.Store.UpdateCredentials(r.Context(), u.ID, creds.salt, creds.kdf, creds.authHash, creds.authSalt, creds.wrapped, &s.ID); err != nil {
+		writeErr(w, err)
+		return
+	}
+	if err := a.cancelPendingReset(r.Context(), u); err != nil {
 		writeErr(w, err)
 		return
 	}

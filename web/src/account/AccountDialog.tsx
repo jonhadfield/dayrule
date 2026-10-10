@@ -34,11 +34,13 @@ import {
 } from '../reminders/reminders'
 import {
   addSignInPasskey,
+  cancelTwoStepReset,
   confirmTotp,
   listSignInPasskeys,
   makeBackupCodes,
   removeSignInPasskey,
   removeTotp,
+  resetDate,
   startTotp,
   twoStepStatus,
   type SignInPasskey,
@@ -53,9 +55,12 @@ import { message, newPasswordProblem } from './validation'
 export function AccountDialog({
   open,
   onOpenChange,
+  focus,
 }: {
   open: boolean
   onOpenChange: (o: boolean) => void
+  /** A section to scroll to on opening. */
+  focus?: 'two-step'
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -69,7 +74,7 @@ export function AccountDialog({
             Your to-dos are encrypted on your devices. These settings never
             change that key.
           </Dialog.Description>
-          {open && <AccountSettings />}
+          {open && <AccountSettings focus={focus} />}
           <p className="text-xs text-text-secondary">
             <a
               href="/privacy"
@@ -95,9 +100,17 @@ export function AccountDialog({
   )
 }
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({
+  title,
+  id,
+  children,
+}: {
+  title: string
+  id?: string
+  children: ReactNode
+}) {
   return (
-    <section className="mb-6 border-t border-hairline pt-4">
+    <section id={id} className="mb-6 border-t border-hairline pt-4">
       <h2 className="mb-2 font-serif text-lg font-semibold">{title}</h2>
       {children}
     </section>
@@ -136,8 +149,11 @@ function Done({ text }: { text: string | null }) {
   ) : null
 }
 
-function AccountSettings() {
+function AccountSettings({ focus }: { focus?: 'two-step' }) {
   const profile = useAccount((s) => s.profile)
+  useEffect(() => {
+    if (focus) document.getElementById(focus)?.scrollIntoView()
+  }, [focus])
   if (!profile) return null
   return (
     <>
@@ -295,7 +311,10 @@ function TwoStepSection() {
   }, [])
   const on = status !== null && (status.passkeys > 0 || status.totp !== null)
   return (
-    <Section title="Two-step sign-in">
+    <Section title="Two-step sign-in" id="two-step">
+      {status?.resetDueAt && (
+        <PendingReset due={status.resetDueAt} reload={load} />
+      )}
       <p className="mb-3 text-sm text-text-secondary">
         When you sign in on a new device, Dayrule asks for a passkey or a code
         from an authenticator app after your password, so a stolen password
@@ -318,6 +337,37 @@ function TwoStepSection() {
       )}
       {status && on && <BackupCodes left={status.backupCodes} reload={load} />}
     </Section>
+  )
+}
+
+/** A reset by email is waiting (PLAN.md §10.2): say when, and offer to stop it. */
+function PendingReset({
+  due,
+  reload,
+}: {
+  due: string
+  reload: () => Promise<void>
+}) {
+  const f = useForm()
+  return (
+    <form
+      aria-label="Pending reset"
+      className="mb-4 rounded-[6px] border border-hairline p-3 text-sm"
+      onSubmit={f.run(async () => {
+        await cancelTwoStepReset()
+        await reload()
+      })}
+    >
+      <ErrorText error={f.error} />
+      <p className="mb-2">
+        Someone with your password asked by email to turn off two-step sign-in.
+        It happens on {resetDate(due)} unless you cancel it. If it wasn’t you,
+        cancel it and change your password.
+      </p>
+      <button type="submit" disabled={f.busy} className={button}>
+        Cancel the reset
+      </button>
+    </form>
   )
 }
 
