@@ -33,7 +33,7 @@ import {
   type Channel,
 } from '../reminders/reminders'
 import { ErrorText, Field } from './ui'
-import { message, passwordProblem } from './validation'
+import { message, newPasswordProblem } from './validation'
 
 /** Account settings (email, password, devices, delete). */
 export function AccountDialog({
@@ -221,7 +221,7 @@ function PasswordSection() {
       <Done text={f.done} />
       <form
         onSubmit={f.run(async () => {
-          const problem = passwordProblem(next, confirm)
+          const problem = await newPasswordProblem(next, confirm)
           if (problem) throw new Error(problem)
           await changePassword(current, next)
           setCurrent('')

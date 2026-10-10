@@ -76,7 +76,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 - 256-bit symmetric keys only; no classical-only public-key crypto protecting
   user data (PLAN.md §10.8).
 - No third-party scripts, analytics or trackers; the CSP in `vercel.json`
-  enforces `'self'` only.
+  enforces `'self'` only. The one exception is `connect-src
+  https://api.pwnedpasswords.com` for the breached-password check
+  (decision 31); don't add others.
 - Never test Firewall rate limits from the owner's connection against production: a block applies to that IP for the whole site. Firewall rules must not use persistent actions (`actionDuration`).
 - Never write secrets into code, docs, commits or PR text. Use env var names
   (`DATABASE_URL`, `RESEND_API_KEY`, …). Get values with `vercel env pull`

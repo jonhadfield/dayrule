@@ -13,7 +13,7 @@ import {
 } from './session'
 import { unlockWithPasskey } from './passkey'
 import { AuthShell, ErrorText, Field, LinkButton, Remember, Submit } from './ui'
-import { message, passwordProblem } from './validation'
+import { message, newPasswordProblem } from './validation'
 
 type Screen = 'sign-in' | 'sign-up' | 'recover'
 
@@ -238,7 +238,7 @@ function SignUp({ onCancel }: { onCancel: () => void }) {
       >
         <form
           onSubmit={run(async () => {
-            const problem = passwordProblem(password, confirm)
+            const problem = await newPasswordProblem(password, confirm)
             if (problem) return setError(problem)
             setPending(await prepareAccount(password))
             setStep('phrase')
@@ -403,7 +403,7 @@ function Recover({ onCancel }: { onCancel: () => void }) {
     >
       <form
         onSubmit={run(async () => {
-          const problem = passwordProblem(password, confirm)
+          const problem = await newPasswordProblem(password, confirm)
           if (problem) return setError(problem)
           await recover(email, words, password, remember)
         })}

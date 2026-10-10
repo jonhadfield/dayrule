@@ -32,7 +32,22 @@ async function emailCode(email: string): Promise<string> {
   return code!
 }
 
+/**
+ * Answers the breached-password check (decision 31) locally, so tests never
+ * call the real Pwned Passwords API. Nothing is breached unless listed as
+ * SHA-1 suffixes (characters 6–40, uppercase).
+ */
+export async function stubBreachCheck(page: Page, breached: string[] = []) {
+  await page.route('https://api.pwnedpasswords.com/range/*', (route) =>
+    route.fulfill({
+      headers: { 'access-control-allow-origin': '*' },
+      body: breached.map((s) => `${s}:3`).join('\r\n'),
+    }),
+  )
+}
+
 export async function signUp(page: Page, email: string) {
+  await stubBreachCheck(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
   await page.getByLabel('Invite code').fill(newInvite())
