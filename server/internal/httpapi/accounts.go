@@ -59,6 +59,7 @@ func (a *Accounts) routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/account/sessions/{id}", a.withSession(a.revokeSession))
 	mux.HandleFunc("DELETE /api/v1/account", a.withSession(a.deleteAccount))
 	a.passkeyRoutes(mux)
+	a.twoStepRoutes(mux)
 }
 
 // ---------------------------------------------------------------------------
@@ -493,12 +494,12 @@ func (a *Accounts) login(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	switch passkey, err := a.needsPasskey(r, u.ID); {
+	switch methods, err := a.secondStepMethods(r, u.ID); {
 	case err != nil:
 		writeErr(w, err)
 		return
-	case passkey:
-		a.startPasskeyLogin(w, r, u.ID, req.DeviceLabel)
+	case len(methods) > 0:
+		a.startSecondStep(w, r, u.ID, req.DeviceLabel, methods)
 		return
 	}
 	a.signedIn(w, r, u, req.DeviceLabel)

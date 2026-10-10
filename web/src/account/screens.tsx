@@ -4,6 +4,7 @@ import {
   recover,
   register,
   signIn,
+  signInWithCode,
   signInWithPasskey,
   signOut,
   signUpStart,
@@ -66,7 +67,7 @@ function SignIn({
   const { busy, error, run } = useSubmit()
   if (step)
     return (
-      <PasskeyStep
+      <SecondStepScreen
         step={step}
         email={email}
         remember={remember}
@@ -110,10 +111,11 @@ function SignIn({
 
 /**
  * Two-step sign-in (decision 30): the password was right, and the account
- * also asks for one of its passkeys. A button, not an automatic prompt:
- * some browsers only show the passkey prompt straight after a tap.
+ * also asks for a passkey or a code (authenticator app or backup code). The
+ * passkey is a button, not an automatic prompt: some browsers only show the
+ * passkey prompt straight after a tap.
  */
-function PasskeyStep({
+function SecondStepScreen({
   step,
   email,
   remember,
@@ -124,21 +126,70 @@ function PasskeyStep({
   remember: boolean
   onRecover: () => void
 }) {
+  const passkey = step.methods.includes('passkey')
+  const totp = step.methods.includes('totp')
+  const backup = step.methods.includes('backup')
+  const [code, setCode] = useState('')
   const { busy, error, run } = useSubmit()
+  const codeLabel = totp
+    ? backup
+      ? 'Code from your authenticator app, or a backup code'
+      : 'Code from your authenticator app'
+    : 'Backup code'
   return (
     <AuthShell
-      title="Use your passkey"
-      subtitle="Your account asks for a passkey as well as your password when you sign in on a new device."
+      title={passkey ? 'Use your passkey' : 'Enter your code'}
+      subtitle="Your account asks for a second step as well as your password when you sign in on a new device."
     >
-      <form onSubmit={run(() => signInWithPasskey(step, email, remember))}>
-        <ErrorText error={error} />
-        <Submit busy={busy}>Use passkey</Submit>
-      </form>
+      <ErrorText error={error} />
+      {passkey && (
+        <form onSubmit={run(() => signInWithPasskey(step, email, remember))}>
+          <Submit busy={busy}>Use passkey</Submit>
+        </form>
+      )}
+      {(totp || backup) && (
+        <form
+          aria-label="Sign in with a code"
+          className={passkey ? 'mt-5 border-t border-hairline pt-5' : ''}
+          onSubmit={run(() => signInWithCode(step, email, remember, code))}
+        >
+          {passkey && (
+            <p className="mb-3 text-sm text-text-secondary">
+              Or use a code instead.
+            </p>
+          )}
+          <Field
+            label={codeLabel}
+            autoComplete="one-time-code"
+            inputMode={backup ? 'text' : 'numeric'}
+            autoCapitalize="none"
+            spellCheck={false}
+            required
+            value={code}
+            onChange={(e) => setCode(e.target.value)}
+          />
+          {passkey ? (
+            <button
+              type="submit"
+              disabled={busy}
+              className="w-full rounded-full border border-hairline px-4 py-2 text-sm font-medium hover:border-accent disabled:opacity-60"
+            >
+              Continue with code
+            </button>
+          ) : (
+            <Submit busy={busy}>Continue</Submit>
+          )}
+        </form>
+      )}
       <div className="mt-5 flex justify-between">
         <LinkButton onClick={() => window.location.assign('/')}>
           Start again
         </LinkButton>
-        <LinkButton onClick={onRecover}>Lost your passkey?</LinkButton>
+        <LinkButton onClick={onRecover}>
+          {passkey && !totp && !backup
+            ? 'Lost your passkey?'
+            : 'Can’t use any of these?'}
+        </LinkButton>
       </div>
     </AuthShell>
   )

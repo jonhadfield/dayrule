@@ -134,6 +134,23 @@ func PasskeyRemoved(to, label string) Message {
 		"The passkey %q was removed from your Dayrule account.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away.\n", label)}
 }
 
+func TOTPAdded(to string) Message {
+	return Message{To: to, Subject: "An authenticator app was added to your Dayrule account", Text: "An authenticator app was set up on your Dayrule account. Signing in now needs your password and a code from the app (or a passkey, if you have one).\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away, then remove the app under Account.\n"}
+}
+
+func TOTPRemoved(to string) Message {
+	return Message{To: to, Subject: "An authenticator app was removed from your Dayrule account", Text: "The authenticator app was removed from your Dayrule account, so its codes no longer sign in.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away.\n"}
+}
+
+func BackupCodesMade(to string) Message {
+	return Message{To: to, Subject: "New Dayrule backup codes", Text: "New backup codes were made for your Dayrule account. Any older ones no longer work.\n\nIf you didn't do this, use your 24-word recovery phrase to set a new password straight away.\n"}
+}
+
+func BackupCodeUsed(to string, left int) Message {
+	return Message{To: to, Subject: "A Dayrule backup code was used", Text: fmt.Sprintf(
+		"A backup code was used to sign in to your Dayrule account. It won't work again; you have %d left. You can make new ones under Account.\n\nIf this wasn't you, use your 24-word recovery phrase to set a new password straight away.\n", left)}
+}
+
 // Reminder says only that there is one, and when: the server can't know
 // what it's for (PLAN.md §10.5).
 func Reminder(to, localTime string) Message {

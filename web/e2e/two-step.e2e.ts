@@ -3,7 +3,15 @@
 // a security key.
 
 import { expect, test, type Page } from '@playwright/test'
-import { add, PASSWORD, signUp, stubBreachCheck } from './helpers'
+import {
+  add,
+  enterPassword,
+  openAccount,
+  PASSWORD,
+  signOut,
+  signUp,
+  stubBreachCheck,
+} from './helpers'
 
 /** Adds a virtual authenticator; returns how to count its passkeys. */
 async function addAuthenticator(page: Page) {
@@ -27,27 +35,6 @@ async function addAuthenticator(page: Page) {
       .length
 }
 
-async function openAccount(page: Page) {
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('button', { name: 'Account…' }).click()
-  return page.getByRole('dialog', { name: 'Account' })
-}
-
-async function signOut(page: Page) {
-  await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('button', { name: 'Sign out' }).click()
-  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({
-    timeout: 30_000,
-  })
-}
-
-async function enterPassword(page: Page, email: string) {
-  await page.getByLabel('Email').fill(email)
-  await page.getByLabel('Password').fill(PASSWORD)
-  await page.getByRole('button', { name: 'Sign in' }).click()
-}
-
 const inbox = (page: Page) => page.getByRole('link', { name: 'Inbox' })
 
 test('a passkey as the second sign-in step', async ({ page, browser }) => {
@@ -59,14 +46,15 @@ test('a passkey as the second sign-in step', async ({ page, browser }) => {
 
   // Account → Two-step sign-in: a wrong password fails before any prompt.
   let account = await openAccount(page)
+  await account.getByRole('button', { name: 'Add a passkey' }).click()
   const addForm = account.getByRole('form', { name: 'Add a sign-in passkey' })
   await addForm.getByLabel('Name (optional)').fill('Test key')
   await addForm.getByLabel('Password').fill('not the password')
-  await addForm.getByRole('button', { name: 'Add a passkey' }).click()
+  await addForm.getByRole('button', { name: 'Add passkey' }).click()
   await expect(account.getByRole('alert')).toContainText(/don.t match/)
   expect(await passkeys()).toBe(0)
   await addForm.getByLabel('Password').fill(PASSWORD)
-  await addForm.getByRole('button', { name: 'Add a passkey' }).click()
+  await addForm.getByRole('button', { name: 'Add passkey' }).click()
   await expect(account.getByText('Passkey added.')).toBeVisible({
     timeout: 30_000,
   })

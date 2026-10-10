@@ -63,3 +63,48 @@ export async function removeSignInPasskey(
     currentAuthKey: await authKeyFor(password),
   })
 }
+
+// ---------------------------------------------------------------------------
+// Authenticator app (TOTP) and backup codes
+
+export interface TwoStepStatus {
+  passkeys: number
+  totp: { addedAt: string; lastUsedAt: string | null } | null
+  backupCodes: number
+}
+
+export function twoStepStatus(): Promise<TwoStepStatus> {
+  return api<TwoStepStatus>('GET', '/account/two-step')
+}
+
+/**
+ * Start setting up an authenticator app: a new secret, as text and as an
+ * otpauth:// URI for a QR code. Nothing changes until confirmTotp.
+ */
+export async function startTotp(
+  password: string,
+): Promise<{ secret: string; uri: string }> {
+  return api('POST', '/account/totp/start', {
+    currentAuthKey: await authKeyFor(password),
+  })
+}
+
+/** Turn the authenticator app on with a code from it. */
+export async function confirmTotp(code: string): Promise<void> {
+  await api('POST', '/account/totp', { code })
+}
+
+export async function removeTotp(password: string): Promise<void> {
+  await api('DELETE', '/account/totp', {
+    currentAuthKey: await authKeyFor(password),
+  })
+}
+
+/** New backup codes, replacing any old ones. Shown once. */
+export async function makeBackupCodes(password: string): Promise<string[]> {
+  return (
+    await api<{ codes: string[] }>('POST', '/account/backup-codes', {
+      currentAuthKey: await authKeyFor(password),
+    })
+  ).codes
+}

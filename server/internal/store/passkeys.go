@@ -156,6 +156,8 @@ const (
 )
 
 // A Ceremony is a passkey registration or sign-in second step in progress.
+// A sign-in's second step can also be answered with a code (TOTP or a
+// backup code) instead of a passkey.
 type Ceremony struct {
 	UserID      uuid.UUID
 	Purpose     string
@@ -232,6 +234,23 @@ func (p Passkeys) TakeChallenge(ctx context.Context, tokenHash []byte, purpose s
 		return nil, err
 	}
 	c.Data = []byte(data)
+	return &c, nil
+}
+
+// CodeAttempt counts one code entered against a live sign-in second step
+// and returns the ceremony. After maxAttempts codes, and once it has
+// expired, it is ErrNotFound.
+func (p Passkeys) CodeAttempt(ctx context.Context, tokenHash []byte, now time.Time, maxAttempts int) (*Ceremony, error) {
+	c := Ceremony{Purpose: CeremonyLogin}
+	err := p.Pool.QueryRow(ctx, `UPDATE webauthn_ceremonies SET code_attempts = code_attempts + 1
+		WHERE token_hash = $1 AND purpose = 'login' AND expires_at > $2 AND code_attempts < $3
+		RETURNING user_id, device_label`, tokenHash, now, maxAttempts).Scan(&c.UserID, &c.DeviceLabel)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
 	return &c, nil
 }
 

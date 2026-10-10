@@ -164,8 +164,8 @@ func (r Records) Push(ctx context.Context, userID uuid.UUID, items []PushItem, n
 }
 
 // GC purges tombstones older than the retention window (raising each
-// user's floor), expired sessions, old email codes and expired passkey
-// ceremonies.
+// user's floor), expired sessions, old email codes, expired passkey
+// ceremonies and TOTP set-ups that were never finished.
 func (r Records) GC(ctx context.Context, now time.Time, retention time.Duration) (purged int64, err error) {
 	tx, err := r.Pool.Begin(ctx)
 	if err != nil {
@@ -191,6 +191,10 @@ func (r Records) GC(ctx context.Context, now time.Time, retention time.Duration)
 		return 0, err
 	}
 	if _, err := tx.Exec(ctx, `DELETE FROM webauthn_ceremonies WHERE expires_at < $1`, now); err != nil {
+		return 0, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM totp_secrets WHERE confirmed_at IS NULL AND created_at < $1`,
+		now.Add(-24*time.Hour)); err != nil {
 		return 0, err
 	}
 	return purged, tx.Commit(ctx)

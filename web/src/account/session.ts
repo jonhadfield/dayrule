@@ -147,7 +147,8 @@ interface LoginResponse {
 
 /**
  * Sign in with the password. Returns the second step if the account has one
- * (then call signInWithPasskey), or null once this device is unlocked.
+ * (then call signInWithPasskey or signInWithCode), or null once this device
+ * is unlocked.
  */
 export async function signIn(
   email: string,
@@ -201,6 +202,23 @@ export async function signInWithPasskey(
   const r = await api<LoginResponse>('POST', '/auth/login/passkey', {
     token: step.token,
     credential: requestJSON(cred as PublicKeyCredential),
+  })
+  await finishSignIn(r, email, remember)
+}
+
+/**
+ * The second step with a code from an authenticator app, or a backup code.
+ * Like signInWithPasskey, the password is still in the crypto worker.
+ */
+export async function signInWithCode(
+  step: SecondStep,
+  email: string,
+  remember: boolean,
+  code: string,
+): Promise<void> {
+  const r = await api<LoginResponse>('POST', '/auth/login/code', {
+    token: step.token,
+    code,
   })
   await finishSignIn(r, email, remember)
 }

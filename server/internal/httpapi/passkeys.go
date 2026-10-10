@@ -12,7 +12,6 @@ import (
 
 	"github.com/go-webauthn/webauthn/protocol"
 	"github.com/go-webauthn/webauthn/webauthn"
-	"github.com/google/uuid"
 
 	"github.com/jonhadfield/dayrule/server/internal/auth"
 	"github.com/jonhadfield/dayrule/server/internal/email"
@@ -154,33 +153,6 @@ func passkeyID(id []byte) string { return base64.RawURLEncoding.EncodeToString(i
 
 // ---------------------------------------------------------------------------
 // Sign-in second step
-
-// needsPasskey reports whether the account signs in with a passkey after
-// the password. Any passkey counts, whatever its site, so asking from an
-// origin without one can't skip the step.
-func (a *Accounts) needsPasskey(r *http.Request, userID uuid.UUID) (bool, error) {
-	if a.Passkeys == nil {
-		return false, nil
-	}
-	keys, err := a.Passkeys.Store.List(r.Context(), userID)
-	return len(keys) > 0, err
-}
-
-// startPasskeyLogin answers a correct password on an account with passkeys:
-// no session and no wrapped key yet, only a token for the second step.
-func (a *Accounts) startPasskeyLogin(w http.ResponseWriter, r *http.Request, userID uuid.UUID, deviceLabel string) {
-	token, hash, err := auth.NewToken()
-	if err != nil {
-		writeErr(w, err)
-		return
-	}
-	c := store.Ceremony{UserID: userID, Purpose: store.CeremonyLogin, DeviceLabel: label(deviceLabel)}
-	if err := a.Passkeys.Store.StartCeremony(r.Context(), hash, c, nil, a.Now().Add(ceremonyLifetime)); err != nil {
-		writeErr(w, err)
-		return
-	}
-	writeJSON(w, http.StatusOK, map[string]any{"secondStep": map[string]any{"token": token, "methods": []string{"passkey"}}})
-}
 
 func (a *Accounts) loginPasskeyOptions(w http.ResponseWriter, r *http.Request) {
 	var req struct {
@@ -478,6 +450,10 @@ func (a *Accounts) deletePasskey(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err != nil {
+		writeErr(w, err)
+		return
+	}
+	if _, err := a.twoStep().DropUnneededBackupCodes(r.Context(), u.ID); err != nil {
 		writeErr(w, err)
 		return
 	}

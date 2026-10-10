@@ -109,3 +109,25 @@ export async function add(page: Page, title: string) {
   await page.keyboard.press('Escape')
   await expect(page.getByText(title, { exact: true })).toBeVisible()
 }
+
+export async function openAccount(page: Page) {
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Account…' }).click()
+  return page.getByRole('dialog', { name: 'Account' })
+}
+
+export async function signOut(page: Page) {
+  await page.keyboard.press('Escape')
+  await page.getByRole('button', { name: 'Settings' }).click()
+  await page.getByRole('button', { name: 'Sign out' }).click()
+  await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({
+    timeout: 30_000,
+  })
+}
+
+/** The password half of signing in, for accounts with a second step. */
+export async function enterPassword(page: Page, email: string) {
+  await page.getByLabel('Email').fill(email)
+  await page.getByLabel('Password').fill(PASSWORD)
+  await page.getByRole('button', { name: 'Sign in' }).click()
+}
