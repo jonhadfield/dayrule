@@ -101,4 +101,25 @@ describe('security headers', () => {
     for (const tag of html.match(/<script\b[^>]*>/g) ?? [])
       expect(tag).toMatch(/\ssrc=/)
   })
+
+  it('serves apple-app-site-association as JSON (native webcredentials)', () => {
+    const rule = vercel.headers.find(
+      (r) => r.source === '/.well-known/apple-app-site-association',
+    )!
+    expect(rule.headers.find((h) => h.key === 'Content-Type')?.value).toBe(
+      'application/json',
+    )
+    const aasa = JSON.parse(
+      readFileSync(
+        new URL(
+          '../../public/.well-known/apple-app-site-association',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    ) as { webcredentials?: { apps?: string[] } }
+    expect(aasa.webcredentials?.apps).toEqual([
+      'VBZY8FBYR5.uk.co.lessknown.dayrule',
+    ])
+  })
 })
