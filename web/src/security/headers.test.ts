@@ -111,7 +111,10 @@ describe('security headers', () => {
     )
     const aasa = JSON.parse(
       readFileSync(
-        new URL('../../public/.well-known/apple-app-site-association', import.meta.url),
+        new URL(
+          '../../public/.well-known/apple-app-site-association',
+          import.meta.url,
+        ),
         'utf8',
       ),
     ) as { webcredentials?: { apps?: string[] } }
