@@ -5,14 +5,14 @@ export function Terms() {
     <article>
       <H1>Terms</H1>
       <p className="mb-6 text-sm text-text-secondary">
-        Last updated 4 October 2026
+        Last updated 17 October 2026
       </p>
 
       <P>
-        These are the terms for using Dayrule, a to-do app run by Jon Hadfield
-        in the United Kingdom (contact:{' '}
-        <a className="text-accent underline" href="mailto:jon@lessknown.co.uk">
-          jon@lessknown.co.uk
+        These are the terms for using Dayrule, a to-do app operated from the
+        United Kingdom (contact:{' '}
+        <a className="text-accent underline" href="mailto:privacy@dayrule.app">
+          privacy@dayrule.app
         </a>
         ). By creating an account you agree to them.
       </P>
