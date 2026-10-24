@@ -13,9 +13,9 @@ test('completing a to-do shows Undo, which puts it back', async ({ page }) => {
   ).toBeVisible()
   await page.getByRole('button', { name: 'Undo' }).click()
 
-  await expect(page.getByRole('status', { name: 'Completed Milk' })).toHaveCount(
-    0,
-  )
+  await expect(
+    page.getByRole('status', { name: 'Completed Milk' }),
+  ).toHaveCount(0)
   await expect(
     page.getByRole('checkbox', { name: 'Complete Milk' }),
   ).toHaveAttribute('aria-checked', 'false')
