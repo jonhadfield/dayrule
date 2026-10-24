@@ -490,7 +490,9 @@ function Devices() {
       <H2>Sync</H2>
       <P>
         Changes sync on their own, within a few seconds when you’re online. The
-        status at the bottom of Settings says when it last synced.
+        status at the bottom of Settings says when it last synced. If the
+        session expires, your lists stay on this device; Sign in to sync
+        connects them again.
       </P>
       <H2>Offline</H2>
       <P>

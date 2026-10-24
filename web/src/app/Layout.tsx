@@ -10,6 +10,7 @@ import { KeyboardPanels } from '../features/pickers/KeyboardPanels'
 import { DragLayer } from '../features/dnd/DragLayer'
 import { QuickFindHost } from '../features/find/QuickFind'
 import { MobileEditor } from '../features/todo/MobileEditor'
+import { SignInToSync } from '../account/SignInAgain'
 import { SelectionBar } from '../features/todo/SelectionBar'
 import { useEdgeSwipeBack } from './useEdgeSwipeBack'
 
@@ -106,6 +107,7 @@ export function Layout() {
     return (
       <DragLayer>
         <div className="min-h-full touch-pan-y touch-pinch-zoom">
+          <SignInToSync />
           <Outlet />
           <MobileEditor />
           <SelectionBar />
@@ -117,16 +119,19 @@ export function Layout() {
   }
   return (
     <DragLayer>
-      <div className="flex h-full">
-        <aside className="w-[260px] shrink-0 border-r border-hairline bg-sidebar">
-          <Sidebar />
-        </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
-        <KeyboardPanels />
-        <QuickFindHost />
-        <SelectionBar />
+      <div className="flex h-full flex-col">
+        <SignInToSync />
+        <div className="flex min-h-0 flex-1">
+          <aside className="w-[260px] shrink-0 border-r border-hairline bg-sidebar">
+            <Sidebar />
+          </aside>
+          <main className="min-w-0 flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
+          <KeyboardPanels />
+          <QuickFindHost />
+          <SelectionBar />
+        </div>
       </div>
     </DragLayer>
   )
