@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react'
 import { bootstrap } from '../app/bootstrap'
 import { StoreProvider } from '../app/StoreProvider'
 import type { EntityStore } from '../store/store'
+import { CoverWhenHidden } from './PrivacyCover'
 import { Locked, SignedOut } from './screens'
 import { lock, resume, useAccount } from './session'
 import { TwoStepPrompt } from './TwoStepPrompt'
@@ -72,6 +73,7 @@ function Unlocked({
     <StoreProvider store={store}>
       {children}
       <TwoStepPrompt />
+      <CoverWhenHidden />
     </StoreProvider>
   )
 }
