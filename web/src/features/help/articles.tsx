@@ -700,7 +700,8 @@ function Shortcuts() {
       <H2>On a computer</H2>
       <P>
         Click a to-do to select it, double-click to open it. Hold <K>Shift</K>{' '}
-        or <K>⌘</K>/<K>Ctrl</K> to select several. Right-click for more. Press{' '}
+        or <K>⌘</K>/<K>Ctrl</K> to select several. Right-click for more. After
+        Complete or Move to Trash, an Undo bar appears for a few seconds. Press{' '}
         <K>?</K> in Dayrule to see these any time.
       </P>
       {[...groups].map(([group, list]) => (
@@ -770,7 +771,8 @@ function Data() {
         <li>This works anywhere, including in Done.</li>
         <li>
           Anything in Trash can be restored. In Trash, <K>Empty Trash</K>{' '}
-          deletes them for good.
+          deletes them for good. Complete, Trash and Empty Trash also show an
+          Undo bar for a few seconds.
         </li>
       </List>
       <H2>Export and import</H2>

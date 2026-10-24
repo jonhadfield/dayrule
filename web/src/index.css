@@ -158,6 +158,19 @@ body {
 .sheet-overlay[data-state='closed'] {
   animation: fade-out 180ms ease-in forwards;
 }
+@keyframes notice-in {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.notice-in {
+  animation: notice-in 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
 
 @media (prefers-reduced-motion: reduce) {
   .check-pop,
@@ -165,7 +178,8 @@ body {
   .editor-in,
   .editor-sheet,
   .sheet,
-  .sheet-overlay {
+  .sheet-overlay,
+  .notice-in {
     animation: none !important;
     transition: none;
   }
