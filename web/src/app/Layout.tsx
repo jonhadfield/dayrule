@@ -11,11 +11,14 @@ import { DragLayer } from '../features/dnd/DragLayer'
 import { QuickFindHost } from '../features/find/QuickFind'
 import { MobileEditor } from '../features/todo/MobileEditor'
 import { SelectionBar } from '../features/todo/SelectionBar'
+import { NoticeBar } from './NoticeBar'
+import { useUndoNotice } from './undo-notice'
 import { useEdgeSwipeBack } from './useEdgeSwipeBack'
 
 /** Desktop: sidebar beside the list. Mobile: one screen at a time. */
 export function Layout() {
   useGlobalKeys()
+  useUndoNotice()
   const isDesktop = useIsDesktop()
   const store = useEntityStore()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -109,6 +112,7 @@ export function Layout() {
           <Outlet />
           <MobileEditor />
           <SelectionBar />
+          <NoticeBar />
           <KeyboardPanels />
           <QuickFindHost />
         </div>
@@ -127,6 +131,7 @@ export function Layout() {
         <KeyboardPanels />
         <QuickFindHost />
         <SelectionBar />
+        <NoticeBar />
       </div>
     </DragLayer>
   )
