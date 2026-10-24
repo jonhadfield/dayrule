@@ -20,7 +20,8 @@ export function PrivacyCover({ show }: { show: boolean }) {
 
 function useTabHidden(): boolean {
   const [hidden, setHidden] = useState(
-    () => typeof document !== 'undefined' && document.visibilityState === 'hidden',
+    () =>
+      typeof document !== 'undefined' && document.visibilityState === 'hidden',
   )
   useEffect(() => {
     const sync = () => setHidden(document.visibilityState === 'hidden')
