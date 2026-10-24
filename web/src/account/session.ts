@@ -179,6 +179,18 @@ export async function signIn(
 }
 
 /**
+ * Get a new server session without leaving the vault. Used when the
+ * cookie expired (401) while lists are still open (decision 35).
+ */
+export async function refreshSession(
+  password: string,
+  remember: boolean,
+): Promise<SecondStep | null> {
+  const profile = currentProfile()
+  return signIn(profile.email, password, remember)
+}
+
+/**
  * The second step with a passkey the server verifies. The password from
  * signIn is still held by the crypto worker, so the account key unwraps as
  * soon as the server hands it over. Can be retried while the step lasts.

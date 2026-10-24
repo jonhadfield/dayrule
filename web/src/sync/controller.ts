@@ -23,11 +23,19 @@ export type SyncState =
   | { kind: 'blocked'; message: string }
   | { kind: 'error' }
   | { kind: 'other-tab' }
+  | { kind: 'needs-sign-in' }
 
 export const useSyncStatus = create<{ state: SyncState }>(() => ({
   state: { kind: 'starting' },
 }))
 const setState = (state: SyncState) => useSyncStatus.setState({ state })
+
+let resumeFn: (() => void) | undefined
+
+/** After a fresh server session, start syncing again (decision 35). */
+export function resumeSync(): void {
+  resumeFn?.()
+}
 
 const VISIBLE_POLL_MS = 15_000
 const HIDDEN_POLL_MS = 60_000
@@ -40,8 +48,6 @@ interface Options {
   db: EncryptedDB
   crypto: SyncCrypto
   net: SyncTransport
-  /** The session ended or the account is gone (401). */
-  onUnauthorized: () => void
 }
 
 interface TabMessage {
@@ -54,6 +60,7 @@ interface TabMessage {
 export function startSync(o: Options): () => void {
   const engine = new SyncEngine(o.store, o.db, o.crypto, o.net)
   let stopped = false
+  let paused = false
   let leader = false
   let timer: ReturnType<typeof setTimeout> | undefined
   let running: Promise<void> | null = null
@@ -61,7 +68,7 @@ export function startSync(o: Options): () => void {
   const cleanups: (() => void)[] = []
 
   const schedule = (delay: number) => {
-    if (!leader || stopped) return
+    if (!leader || stopped || paused) return
     clearTimeout(timer)
     timer = setTimeout(() => void run(), delay)
   }
@@ -89,8 +96,10 @@ export function startSync(o: Options): () => void {
       schedulePoll()
     } catch (err) {
       if (err instanceof ApiError && err.status === 401) {
-        stop()
-        o.onUnauthorized()
+        // Session expired or revoked: keep the vault open (decision 35).
+        paused = true
+        clearTimeout(timer)
+        setState({ kind: 'needs-sign-in' })
         return
       }
       if (err instanceof SyncBlockedError)
@@ -107,7 +116,7 @@ export function startSync(o: Options): () => void {
 
   /** Between syncs, ask the server cheaply whether anything changed. */
   async function poll(): Promise<void> {
-    if (!leader || stopped || running) return
+    if (!leader || stopped || paused || running) return
     try {
       const head = await o.net.head()
       if (head.seq > (await engine.cursor())) await run()
@@ -122,7 +131,7 @@ export function startSync(o: Options): () => void {
 
   // Polls share the timer, so a scheduled sync replaces a pending poll.
   const schedulePoll = () => {
-    if (!leader || stopped) return
+    if (!leader || stopped || paused) return
     clearTimeout(timer)
     timer = setTimeout(() => void poll(), pollDelay())
   }
@@ -190,11 +199,20 @@ export function startSync(o: Options): () => void {
     becomeLeader()
   }
 
+  function resume() {
+    if (stopped) return
+    paused = false
+    if (leader) schedule(0)
+  }
+  resumeFn = resume
+
   function stop() {
     if (stopped) return
     stopped = true
     leader = false
+    paused = false
     clearTimeout(timer)
+    if (resumeFn === resume) resumeFn = undefined
     for (const c of cleanups) c()
   }
 

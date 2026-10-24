@@ -1,6 +1,5 @@
 import Dexie from 'dexie'
 import { keyring } from '../crypto/client'
-import { signOut } from '../account/session'
 import { startSync } from '../sync/controller'
 import { startReminders } from '../reminders/reminders'
 import { httpTransport } from '../sync/transport'
@@ -55,9 +54,6 @@ export async function bootstrap(
       decrypt: (items) => keyring().decrypt(items),
     },
     net: httpTransport,
-    // The session expired, was revoked, or the account was deleted
-    // elsewhere. Encrypted data stays, so unsynced changes aren't lost.
-    onUnauthorized: () => void signOut(),
   })
   const stopReminders = startReminders({
     userId,

@@ -32,6 +32,11 @@ function describe(
         dot: 'bg-deadline',
         text: 'Can’t sync right now · changes saved on this device',
       }
+    case 'needs-sign-in':
+      return {
+        dot: 'bg-deadline',
+        text: 'On this device only · sign in to sync',
+      }
   }
 }
 
