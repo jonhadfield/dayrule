@@ -609,6 +609,11 @@ function Privacy() {
         on that device with Face ID, Touch ID or Windows Hello instead of typing
         your password. Your password still works.
       </P>
+      <H2>When you leave the tab</H2>
+      <P>
+        Switching to another tab or the app switcher hides your lists behind the
+        Dayrule name until you come back. Sign-in stays a password screen.
+      </P>
       <H2>What we can see</H2>
       <P>
         Your email address, how much you store, when your devices sync, and —
