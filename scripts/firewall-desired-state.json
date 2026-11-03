@@ -1,0 +1,108 @@
+{
+  "_comment": "Desired production Firewall custom rules for dayrule.app. Compare with: scripts/firewall-check.sh. Edit live rules only via `vercel firewall`, then update this file and publish in the same change. Never use persistent actions (actionDuration) on rate limits — see docs/firewall.md and PLAN decision 36.",
+  "managed": {
+    "bot-protection": "off",
+    "ai-bots": "allow",
+    "bot-id": "basic"
+  },
+  "botIdPolicy": {
+    "checkBotIdInApp": false,
+    "deepAnalysis": false,
+    "reason": "PLAN decision 25 + 36: no BotID challenge script; Basic without checkBotId() is a no-op. Native clients cannot pass a browser challenge."
+  },
+  "rules": [
+    {
+      "id": "rule_rate_limit_sign_up_1u6XMD",
+      "name": "Rate limit sign-up",
+      "active": true,
+      "description": "Sign-up sends emails: 10 per hour per IP+JA4 (CGNAT-safe; PLAN.md).",
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "op": "pre", "type": "path", "value": "/api/v1/auth/signup/" },
+            { "op": "eq", "type": "method", "value": "POST" }
+          ]
+        }
+      ],
+      "rateLimit": {
+        "algo": "fixed_window",
+        "keys": ["ip", "ja4"],
+        "limit": 10,
+        "window": 3600,
+        "action": "rate_limit"
+      }
+    },
+    {
+      "id": "rule_rate_limit_sign_in_3LEntS",
+      "name": "Rate limit sign-in",
+      "active": true,
+      "description": "Prelogin and login: 30 per 10 minutes per IP+JA4 (CGNAT-safe; PLAN). Per-account lockout remains in the API.",
+      "conditionGroup": [
+        {
+          "conditions": [
+            {
+              "op": "re",
+              "type": "path",
+              "value": "^/api/v1/auth/(prelogin|login)$"
+            },
+            { "op": "eq", "type": "method", "value": "POST" }
+          ]
+        }
+      ],
+      "rateLimit": {
+        "algo": "fixed_window",
+        "keys": ["ip", "ja4"],
+        "limit": 30,
+        "window": 600,
+        "action": "rate_limit"
+      }
+    },
+    {
+      "id": "rule_rate_limit_recovery_A9XdkI",
+      "name": "Rate limit recovery",
+      "active": true,
+      "description": "Recovery: 10 per hour per IP+JA4 (CGNAT-safe; PLAN.md).",
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "op": "pre", "type": "path", "value": "/api/v1/auth/recover/" },
+            { "op": "eq", "type": "method", "value": "POST" }
+          ]
+        }
+      ],
+      "rateLimit": {
+        "algo": "fixed_window",
+        "keys": ["ip", "ja4"],
+        "limit": 10,
+        "window": 3600,
+        "action": "rate_limit"
+      }
+    },
+    {
+      "id": "rule_rate_limit_email_change_dz2gyu",
+      "name": "Rate limit email change",
+      "active": true,
+      "description": "Email change sends emails: 10 per hour per IP+JA4 (CGNAT-safe; PLAN.md).",
+      "conditionGroup": [
+        {
+          "conditions": [
+            { "op": "pre", "type": "path", "value": "/api/v1/account/email/" },
+            { "op": "eq", "type": "method", "value": "POST" }
+          ]
+        }
+      ],
+      "rateLimit": {
+        "algo": "fixed_window",
+        "keys": ["ip", "ja4"],
+        "limit": 10,
+        "window": 3600,
+        "action": "rate_limit"
+      }
+    }
+  ],
+  "forbidden": {
+    "persistentActions": true,
+    "rateLimitKeysIpOnly": true,
+    "clientHeaderExemption": "Never exempt by X-Dayrule-Client alone — spoofable."
+  }
+}
