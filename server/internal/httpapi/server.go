@@ -20,6 +20,11 @@ type Config struct {
 	DB      Pinger
 	Version string
 	Logger  *slog.Logger
+	// MinIOSBuild / MinMacOSBuild are the lowest native CFBundleVersion
+	// (X-Dayrule-Client ios|macos/<n>) allowed to use the API. 0 means unset
+	// — no gate. Below the floor the edge returns 426 upgrade_required.
+	MinIOSBuild   int
+	MinMacOSBuild int
 	// Accounts serves the account endpoints; nil without a database.
 	Accounts *Accounts
 	// Sync serves the sync endpoints; nil without a database.
@@ -42,7 +47,7 @@ func NewHandler(cfg Config) http.Handler {
 		cfg.Reminders.routes(mux)
 	}
 
-	return recoverer(cfg.Logger, requestLogger(cfg.Logger, requireClientHeader(mux)))
+	return recoverer(cfg.Logger, requestLogger(cfg.Logger, requireClientHeader(requireMinNativeBuild(cfg, mux))))
 }
 
 type healthResponse struct {
