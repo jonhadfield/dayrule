@@ -228,6 +228,21 @@ export function ProjectPage() {
             <button
               type="button"
               className="text-xs text-text-secondary hover:text-text"
+              onClick={() => {
+                const next = store.run('Convert Heading to Project', (d, env) =>
+                  cmd.convertHeadingToProject(d, env, heading.id),
+                )
+                void navigate({
+                  to: '/project/$projectId',
+                  params: { projectId: next.id },
+                })
+              }}
+            >
+              Convert
+            </button>
+            <button
+              type="button"
+              className="text-xs text-text-secondary hover:text-text"
               onClick={() =>
                 store.run('Archive Heading', (d, env) =>
                   cmd.updateHeading(d, env, heading.id, { archived: true }),

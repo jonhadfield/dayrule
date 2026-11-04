@@ -514,6 +514,47 @@ export function convertProjectToTodo(d: Draft, env: Env, projectId: ID): Todo {
   return d.get('todos', patched.id)!
 }
 
+/**
+ * Turn a heading into a project (PLAN.md §8.2). Its to-dos move into the new
+ * project (no heading); the heading is removed. The new project shares the
+ * parent project's area.
+ */
+export function convertHeadingToProject(
+  d: Draft,
+  env: Env,
+  headingId: ID,
+): Project {
+  const h = d.get('headings', headingId)
+  if (!h) throw new Error('heading not found')
+  const parent = d.get('projects', h.projectId)
+  const siblings = d.all('projects').filter((p) => p.areaId === parent?.areaId)
+  const project: Project = {
+    type: 'project',
+    id: env.newId(),
+    createdAt: stamp(env),
+    updatedAt: stamp(env),
+    title: h.title,
+    notes: '',
+    status: 'open',
+    start: 'ready',
+    tonight: false,
+    tagIds: [],
+    order: keyAfterLast(siblings.map((p) => p.order)),
+    ...(parent?.areaId ? { areaId: parent.areaId } : {}),
+  }
+  d.put('projects', project)
+
+  const children = d
+    .all('todos')
+    .filter((t) => t.headingId === headingId && !t.trashedAt)
+    .sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+  for (const t of children) {
+    moveTodos(d, env, [t.id], { kind: 'project', projectId: project.id })
+  }
+  d.remove('headings', headingId)
+  return project
+}
+
 export function createArea(d: Draft, env: Env, title: string): Area {
   const area: Area = {
     type: 'area',

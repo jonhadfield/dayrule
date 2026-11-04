@@ -177,6 +177,35 @@ describe('store commands', () => {
     expect(Object.keys(s.entities.checklistItems)).toEqual([])
   })
 
+  it('converts a heading into a project and moves its to-dos', () => {
+    const s = createEntityStore(undefined, testClock())
+    const area = s.run('a', (d, env) => cmd.createArea(d, env, 'Home'))
+    const parent = s.run('p', (d, env) =>
+      cmd.createProject(d, env, { title: 'Parent', areaId: area.id }),
+    )
+    const h = s.run('h', (d, env) =>
+      cmd.createHeading(d, env, parent.id, 'Kitchen'),
+    )
+    const t = s.run('t', (d, env) =>
+      cmd.createTodo(d, env, {
+        title: 'Clean',
+        placement: {
+          list: 'project',
+          projectId: parent.id,
+          headingId: h.id,
+        },
+      }),
+    )
+    const next = s.run('convert', (d, env) =>
+      cmd.convertHeadingToProject(d, env, h.id),
+    )
+    expect(s.entities.headings[h.id]).toBeUndefined()
+    expect(s.entities.projects[next.id]?.title).toBe('Kitchen')
+    expect(s.entities.projects[next.id]?.areaId).toBe(area.id)
+    expect(s.entities.todos[t.id]?.projectId).toBe(next.id)
+    expect(s.entities.todos[t.id]?.headingId).toBeUndefined()
+  })
+
   it('converts a project into a to-do with checklist children', () => {
     const s = createEntityStore(undefined, testClock())
     const p = s.run('p', (d, env) =>
