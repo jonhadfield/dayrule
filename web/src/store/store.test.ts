@@ -146,6 +146,101 @@ describe('store commands', () => {
     s.run('noop', (d, env) => cmd.setStatus(d, env, ['missing'], 'completed'))
     expect(s.store.getState().past).toEqual([])
   })
+
+  it('converts a to-do with checklist into a project', () => {
+    const s = createEntityStore(undefined, testClock())
+    const t = s.run('t', (d, env) =>
+      cmd.createTodo(d, env, {
+        title: 'Pack',
+        placement: { list: 'today' },
+      }),
+    )
+    s.run('c', (d, env) => cmd.addChecklistItem(d, env, t.id, 'socks'))
+    const done = s.run('c', (d, env) =>
+      cmd.addChecklistItem(d, env, t.id, 'passport'),
+    )
+    s.run('tick', (d, env) =>
+      cmd.updateChecklistItem(d, env, done.id, { done: true }),
+    )
+    const p = s.run('convert', (d, env) =>
+      cmd.convertTodoToProject(d, env, t.id),
+    )
+    expect(s.entities.todos[t.id]).toBeUndefined()
+    expect(s.entities.projects[p.id]?.title).toBe('Pack')
+    expect(s.entities.projects[p.id]?.startDate).toBe('2026-10-04')
+    const kids = Object.values(s.entities.todos).filter(
+      (x) => x.projectId === p.id,
+    )
+    expect(kids.map((x) => x.title).sort()).toEqual(['passport', 'socks'])
+    expect(kids.find((x) => x.title === 'passport')?.status).toBe('completed')
+    expect(kids.find((x) => x.title === 'socks')?.status).toBe('open')
+    expect(Object.keys(s.entities.checklistItems)).toEqual([])
+  })
+
+  it('converts a heading into a project and moves its to-dos', () => {
+    const s = createEntityStore(undefined, testClock())
+    const area = s.run('a', (d, env) => cmd.createArea(d, env, 'Home'))
+    const parent = s.run('p', (d, env) =>
+      cmd.createProject(d, env, { title: 'Parent', areaId: area.id }),
+    )
+    const h = s.run('h', (d, env) =>
+      cmd.createHeading(d, env, parent.id, 'Kitchen'),
+    )
+    const t = s.run('t', (d, env) =>
+      cmd.createTodo(d, env, {
+        title: 'Clean',
+        placement: {
+          list: 'project',
+          projectId: parent.id,
+          headingId: h.id,
+        },
+      }),
+    )
+    const next = s.run('convert', (d, env) =>
+      cmd.convertHeadingToProject(d, env, h.id),
+    )
+    expect(s.entities.headings[h.id]).toBeUndefined()
+    expect(s.entities.projects[next.id]?.title).toBe('Kitchen')
+    expect(s.entities.projects[next.id]?.areaId).toBe(area.id)
+    expect(s.entities.todos[t.id]?.projectId).toBe(next.id)
+    expect(s.entities.todos[t.id]?.headingId).toBeUndefined()
+  })
+
+  it('converts a project into a to-do with checklist children', () => {
+    const s = createEntityStore(undefined, testClock())
+    const p = s.run('p', (d, env) =>
+      cmd.createProject(d, env, { title: 'Trip' }),
+    )
+    s.run('h', (d, env) => cmd.createHeading(d, env, p.id, 'Drop me'))
+    const a = s.run('t', (d, env) =>
+      cmd.createTodo(d, env, {
+        title: 'Book',
+        placement: { list: 'project', projectId: p.id },
+      }),
+    )
+    const b = s.run('t', (d, env) =>
+      cmd.createTodo(d, env, {
+        title: 'Pack',
+        placement: { list: 'project', projectId: p.id },
+      }),
+    )
+    s.run('done', (d, env) => cmd.setStatus(d, env, [b.id], 'completed'))
+    const todo = s.run('convert', (d, env) =>
+      cmd.convertProjectToTodo(d, env, p.id),
+    )
+    expect(s.entities.projects[p.id]).toBeUndefined()
+    expect(s.entities.todos[a.id]).toBeUndefined()
+    expect(s.entities.todos[b.id]).toBeUndefined()
+    expect(Object.keys(s.entities.headings)).toEqual([])
+    expect(todo.title).toBe('Trip')
+    const checks = Object.values(s.entities.checklistItems)
+      .filter((c) => c.todoId === todo.id)
+      .sort((x, y) => (x.order < y.order ? -1 : 1))
+    expect(checks.map((c) => [c.title, c.done])).toEqual([
+      ['Book', false],
+      ['Pack', true],
+    ])
+  })
 })
 
 describe('undo and redo', () => {
