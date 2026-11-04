@@ -10,16 +10,16 @@ import (
 
 // Todo is the decrypted subset the CLI/MCP needs.
 type Todo struct {
-	ID        string `json:"id"`
-	Title     string `json:"title"`
-	Notes     string `json:"notes,omitempty"`
-	Status    string `json:"status"`
-	Start     string `json:"start"`
-	StartDate string `json:"startDate,omitempty"`
-	Deadline  string `json:"deadline,omitempty"`
-	Order     string `json:"order"`
-	Seq       int64  `json:"-"`
-	EntityKey string `json:"-"`
+	ID        string          `json:"id"`
+	Title     string          `json:"title"`
+	Notes     string          `json:"notes,omitempty"`
+	Status    string          `json:"status"`
+	Start     string          `json:"start"`
+	StartDate string          `json:"startDate,omitempty"`
+	Deadline  string          `json:"deadline,omitempty"`
+	Order     string          `json:"order"`
+	Seq       int64           `json:"-"`
+	EntityKey string          `json:"-"`
 	Raw       json.RawMessage `json:"-"`
 }
 
