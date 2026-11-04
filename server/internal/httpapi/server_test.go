@@ -3,7 +3,6 @@ package httpapi
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"io"
 	"log/slog"
 	"net/http"
@@ -11,9 +10,9 @@ import (
 	"testing"
 )
 
-type fakePinger struct{ err error }
+type fakePinger struct{}
 
-func (f fakePinger) Ping(context.Context) error { return f.err }
+func (fakePinger) Ping(context.Context) error { return nil }
 
 func TestHealth(t *testing.T) {
 	tests := []struct {
@@ -29,16 +28,10 @@ func TestHealth(t *testing.T) {
 			want:     healthResponse{Status: "ok", Database: "unconfigured", Version: "test"},
 		},
 		{
-			name:     "database reachable",
+			name:     "database configured without pinging it",
 			db:       fakePinger{},
 			wantCode: http.StatusOK,
-			want:     healthResponse{Status: "ok", Database: "ok", Version: "test"},
-		},
-		{
-			name:     "database down",
-			db:       fakePinger{err: errors.New("connection refused")},
-			wantCode: http.StatusServiceUnavailable,
-			want:     healthResponse{Status: "degraded", Database: "unavailable", Version: "test"},
+			want:     healthResponse{Status: "ok", Database: "configured", Version: "test"},
 		},
 	}
 

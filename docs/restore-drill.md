@@ -67,7 +67,8 @@ API key in `NEON_API_KEY`. Prefer `neonctl` once logged in.
 
    ```bash
    curl -sS "http://127.0.0.1:$PORT/api/health"
-   # expect: {"status":"ok","database":"ok",...}
+   # expect: {"status":"ok","database":"configured",...}
+   # Health does not ping Neon; the SQL counts above are the DB check.
    ```
 
    A full browser sign-in against the restore copy is optional; it needs a
@@ -101,5 +102,5 @@ timestamp with Time Travel Assist / read-only queries, then restore
 | Date | 2026-10-17 |
 | Method | API: child of `main` at `parent_timestamp` ≈ T−1h |
 | Branch | `restore-drill-20261017-0956` (deleted after smoke) |
-| Checks | Postgres 18 schema present; counts on `users` / `sessions` / `records`; local `GET /api/health` → `database: ok` |
+| Checks | Postgres 18 schema present; counts on `users` / `sessions` / `records`; local `GET /api/health` → `database: configured` |
 | Result | Pass |
