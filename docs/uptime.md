@@ -1,15 +1,17 @@
 # Uptime check
 
-Production exposes `GET /api/health` (no auth). It pings Neon and returns:
+Production exposes `GET /api/health` (no auth). It reports whether the
+API Function is up. It does **not** ping Neon, so this probe cannot keep
+compute from scaling to zero. A sleeping database is still “ok” here;
+the next real request (sync or the reminders cron) pays the cold start.
 
 ```json
-{"status":"ok","database":"ok","version":"<git sha prefix>"}
+{"status":"ok","database":"configured","version":"<git sha prefix>"}
 ```
 
 | HTTP | Meaning |
 |---|---|
-| 200 + `status=ok`, `database=ok` | App and database reachable |
-| 503 + `status=degraded`, `database=unavailable` | App up, Neon ping failed |
+| 200 + `status=ok`, `database=configured` | Function up, `DATABASE_URL` loaded (not a live Neon ping) |
 | 200 + `database=unconfigured` | Local/dev without a database (not production) |
 
 ## External probe

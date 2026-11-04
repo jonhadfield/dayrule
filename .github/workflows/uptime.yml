@@ -1,5 +1,6 @@
-# External probe of production /api/health (outside Vercel). Failures email
-# watchers who have Actions failure notifications on. No public status page.
+# External probe of production /api/health (outside Vercel). Function
+# liveness only — does not ping Neon. Failures email watchers who have
+# Actions failure notifications on. No public status page.
 name: Uptime
 
 on:

@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Probe Dayrule's public health endpoint from outside the Vercel/Neon network.
 # Usage: scripts/uptime-check.sh [origin]
-# Exit 0 only when HTTP 200 and JSON status=ok, database=ok.
+# Exit 0 only when HTTP 200 and JSON status=ok. Does not require a Neon ping:
+# health is Function liveness so the probe cannot keep compute awake.
 set -euo pipefail
 
 ORIGIN="${1:-https://dayrule.app}"
@@ -25,17 +26,21 @@ if [[ "$code" != "200" ]]; then
   exit 1
 fi
 
-python3 - "$body" <<'PY'
+python3 - "$body" "$ORIGIN" <<'PY'
 import json, sys
-path = sys.argv[1]
+path, origin = sys.argv[1], sys.argv[2].rstrip("/")
 with open(path) as f:
     data = json.load(f)
 status = data.get("status")
 database = data.get("database")
 version = data.get("version")
 print(f"status={status!r} database={database!r} version={version!r}")
-if status != "ok" or database != "ok":
-    sys.exit(f"uptime-check: want status=ok database=ok, got status={status!r} database={database!r}")
+if status != "ok":
+    sys.exit(f"uptime-check: want status=ok, got status={status!r}")
 if not version:
     sys.exit("uptime-check: missing version")
+if database not in ("configured", "unconfigured"):
+    sys.exit(f"uptime-check: unexpected database={database!r}")
+if origin == "https://dayrule.app" and database != "configured":
+    sys.exit("uptime-check: production should have a database attached")
 PY
