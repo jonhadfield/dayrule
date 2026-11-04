@@ -435,14 +435,9 @@ export function convertTodoToProject(d: Draft, env: Env, todoId: ID): Project {
     ...(t.startDate !== undefined ? { startDate: t.startDate } : {}),
     ...(t.deadline !== undefined ? { deadline: t.deadline } : {}),
     ...(t.areaId ? { areaId: t.areaId } : {}),
-    ...(status !== 'open'
-      ? { completedAt: t.completedAt ?? stamp(env) }
-      : {}),
+    ...(status !== 'open' ? { completedAt: t.completedAt ?? stamp(env) } : {}),
   }
-  if (
-    project.startDate !== undefined &&
-    project.startDate <= env.today
-  ) {
+  if (project.startDate !== undefined && project.startDate <= env.today) {
     project.todayOrder = keyAfterLast(todayKeys(d, env))
   }
   d.put('projects', project)
@@ -495,9 +490,7 @@ export function convertProjectToTodo(d: Draft, env: Env, projectId: ID): Todo {
     tagIds: [...p.tagIds],
     ...(p.startDate !== undefined ? { startDate: p.startDate } : {}),
     ...(p.deadline !== undefined ? { deadline: p.deadline } : {}),
-    ...(status !== 'open'
-      ? { completedAt: p.completedAt ?? stamp(env) }
-      : {}),
+    ...(status !== 'open' ? { completedAt: p.completedAt ?? stamp(env) } : {}),
     ...(p.startDate !== undefined && p.startDate <= env.today
       ? { todayOrder: keyAfterLast(todayKeys(d, env)) }
       : {}),
