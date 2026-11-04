@@ -33,6 +33,7 @@ web/e2e/.out/
 # Go
 server/bin/
 server/dayruled
+server/dayrule
 *.test
 *.out
 go.work.sum
