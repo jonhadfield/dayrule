@@ -1,3 +1,4 @@
+import { useNavigate } from '@tanstack/react-router'
 import { ContextMenu } from 'radix-ui'
 import type { ReactNode } from 'react'
 import { useEntityStore } from '../../app/context'
@@ -19,6 +20,7 @@ export function RowMenu({
   children: ReactNode
 }) {
   const store = useEntityStore()
+  const navigate = useNavigate()
   const targets = () => {
     const ui = useUI.getState()
     if (ui.selectedIds.includes(todoId)) return ui.selectedIds
@@ -73,6 +75,21 @@ export function RowMenu({
             Reopen
           </ContextMenu.Item>
           <ContextMenu.Separator className="my-1 h-px bg-hairline" />
+          <ContextMenu.Item
+            className={item}
+            onSelect={() => {
+              const project = store.run('Convert to Project', (d, env) =>
+                cmd.convertTodoToProject(d, env, todoId),
+              )
+              useUI.getState().select(null)
+              void navigate({
+                to: '/project/$projectId',
+                params: { projectId: project.id },
+              })
+            }}
+          >
+            Convert to Project
+          </ContextMenu.Item>
           <ContextMenu.Item
             className={`${item} text-deadline`}
             onSelect={() => {

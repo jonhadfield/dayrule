@@ -8,6 +8,7 @@
 //	go run ./cmd/dayrule today
 //	go run ./cmd/dayrule add "Buy milk"
 //	go run ./cmd/dayrule complete "Buy milk"
+//	go run ./cmd/dayrule schedule "Buy milk"
 //	go run ./cmd/dayrule mcp
 package main
 
@@ -79,6 +80,13 @@ func main() {
 			fatal(err)
 		}
 		fmt.Printf("Completed: %s (%s)\n", t.Title, t.ID)
+	case "schedule":
+		q := strings.TrimSpace(strings.Join(args, " "))
+		t, err := s.ScheduleToday(ctx, q)
+		if err != nil {
+			fatal(err)
+		}
+		fmt.Printf("Scheduled for Today: %s (%s)\n", t.Title, t.ID)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n", cmd)
 		usage()
@@ -113,6 +121,7 @@ Usage:
   dayrule today
   dayrule add <title>
   dayrule complete <id-or-title>
+  dayrule schedule <id-or-title>
   dayrule mcp
 
 Environment:
