@@ -6,10 +6,10 @@ import (
 	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
 )
 
-// Pinger reports whether the database is reachable.
+// Pinger is a database handle. Health only checks whether one is attached;
+// it does not Ping, so the uptime probe cannot keep Neon from scaling to zero.
 type Pinger interface {
 	Ping(ctx context.Context) error
 }
@@ -20,6 +20,11 @@ type Config struct {
 	DB      Pinger
 	Version string
 	Logger  *slog.Logger
+	// MinIOSBuild / MinMacOSBuild are the lowest native CFBundleVersion
+	// (X-Dayrule-Client ios|macos/<n>) allowed to use the API. 0 means unset
+	// — no gate. Below the floor the edge returns 426 upgrade_required.
+	MinIOSBuild   int
+	MinMacOSBuild int
 	// Accounts serves the account endpoints; nil without a database.
 	Accounts *Accounts
 	// Sync serves the sync endpoints; nil without a database.
@@ -42,7 +47,7 @@ func NewHandler(cfg Config) http.Handler {
 		cfg.Reminders.routes(mux)
 	}
 
-	return recoverer(cfg.Logger, requestLogger(cfg.Logger, requireClientHeader(mux)))
+	return recoverer(cfg.Logger, requestLogger(cfg.Logger, requireClientHeader(requireMinNativeBuild(cfg, mux))))
 }
 
 type healthResponse struct {
@@ -52,26 +57,14 @@ type healthResponse struct {
 }
 
 func healthHandler(cfg Config) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
+	return func(w http.ResponseWriter, _ *http.Request) {
 		resp := healthResponse{Status: "ok", Database: "unconfigured", Version: cfg.Version}
-		code := http.StatusOK
-
 		if cfg.DB != nil {
-			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-			defer cancel()
-
-			if err := cfg.DB.Ping(ctx); err != nil {
-				cfg.Logger.WarnContext(r.Context(), "database ping failed", "error", err)
-				resp.Status = "degraded"
-				resp.Database = "unavailable"
-				code = http.StatusServiceUnavailable
-			} else {
-				resp.Database = "ok"
-			}
+			resp.Database = "configured"
 		}
 
 		w.Header().Set("Cache-Control", "no-store")
-		writeJSON(w, code, resp)
+		writeJSON(w, http.StatusOK, resp)
 	}
 }
 

@@ -71,9 +71,25 @@ var (
 )
 
 // rp picks the relying party for the page that sent the request.
+// Browsers send Origin. Native URLSession clients do not (native PLAN §9.3);
+// those use the production RP when configured, otherwise the sole configured
+// origin (local/dev).
 func (p *Passkeys) rp(r *http.Request) (*webauthn.WebAuthn, error) {
-	if wa, ok := p.rps[r.Header.Get("Origin")]; ok {
-		return wa, nil
+	if origin := r.Header.Get("Origin"); origin != "" {
+		if wa, ok := p.rps[origin]; ok {
+			return wa, nil
+		}
+		return nil, errPasskeyOrigin
+	}
+	if nativeClient(r.Header.Get("X-Dayrule-Client")) {
+		if wa, ok := p.rps["https://dayrule.app"]; ok {
+			return wa, nil
+		}
+		if len(p.rps) == 1 {
+			for _, wa := range p.rps {
+				return wa, nil
+			}
+		}
 	}
 	return nil, errPasskeyOrigin
 }

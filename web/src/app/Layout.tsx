@@ -10,12 +10,16 @@ import { KeyboardPanels } from '../features/pickers/KeyboardPanels'
 import { DragLayer } from '../features/dnd/DragLayer'
 import { QuickFindHost } from '../features/find/QuickFind'
 import { MobileEditor } from '../features/todo/MobileEditor'
+import { SignInToSync } from '../account/SignInAgain'
 import { SelectionBar } from '../features/todo/SelectionBar'
+import { NoticeBar } from './NoticeBar'
+import { useUndoNotice } from './undo-notice'
 import { useEdgeSwipeBack } from './useEdgeSwipeBack'
 
 /** Desktop: sidebar beside the list. Mobile: one screen at a time. */
 export function Layout() {
   useGlobalKeys()
+  useUndoNotice()
   const isDesktop = useIsDesktop()
   const store = useEntityStore()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
@@ -106,9 +110,11 @@ export function Layout() {
     return (
       <DragLayer>
         <div className="min-h-full touch-pan-y touch-pinch-zoom">
+          <SignInToSync />
           <Outlet />
           <MobileEditor />
           <SelectionBar />
+          <NoticeBar />
           <KeyboardPanels />
           <QuickFindHost />
         </div>
@@ -117,16 +123,20 @@ export function Layout() {
   }
   return (
     <DragLayer>
-      <div className="flex h-full">
-        <aside className="w-[260px] shrink-0 border-r border-hairline bg-sidebar">
-          <Sidebar />
-        </aside>
-        <main className="min-w-0 flex-1 overflow-y-auto">
-          <Outlet />
-        </main>
-        <KeyboardPanels />
-        <QuickFindHost />
-        <SelectionBar />
+      <div className="flex h-full flex-col">
+        <SignInToSync />
+        <div className="flex min-h-0 flex-1">
+          <aside className="w-[260px] shrink-0 border-r border-hairline bg-sidebar">
+            <Sidebar />
+          </aside>
+          <main className="min-w-0 flex-1 overflow-y-auto">
+            <Outlet />
+          </main>
+          <KeyboardPanels />
+          <QuickFindHost />
+          <SelectionBar />
+          <NoticeBar />
+        </div>
       </div>
     </DragLayer>
   )

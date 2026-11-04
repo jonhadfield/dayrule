@@ -1,0 +1,27 @@
+# External probe of production /api/health (outside Vercel). Function
+# liveness only — does not ping Neon. Failures email watchers who have
+# Actions failure notifications on. No public status page.
+name: Uptime
+
+on:
+  schedule:
+    # GitHub may delay cron; ~15 minutes is enough for invite-only.
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: uptime-production
+  cancel-in-progress: false
+
+jobs:
+  health:
+    name: dayrule.app /api/health
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - uses: actions/checkout@v7
+      - name: Check production health
+        run: bash scripts/uptime-check.sh https://dayrule.app

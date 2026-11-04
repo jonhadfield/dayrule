@@ -10,7 +10,8 @@ changes.
 
 - `web/` — React 19 + Vite + TypeScript + Tailwind v4 PWA (pnpm workspace).
 - `server/` — Go API (`cmd/dayruled`), migrations (`migrations/`, goose,
-  embedded), migration runner (`cmd/migrate`).
+  embedded), migration runner (`cmd/migrate`), local CLI/MCP (`cmd/dayrule`;
+  see `docs/cli-mcp.md`).
 - `vercel.json` — Vercel Services: `web` (static) and `api` (Go Function);
   `/api/*` goes to the API, everything else to the SPA.
 
@@ -33,6 +34,8 @@ From `server/`:
 
 - `go run ./cmd/dayruled` — API on `:8080`. Without `DATABASE_URL` it runs with
   no database and `/api/health` reports `"database": "unconfigured"`.
+- `go run ./cmd/dayrule …` — local CLI / `mcp` (needs `DAYRULE_EMAIL` and
+  `DAYRULE_PASSWORD`; see `docs/cli-mcp.md`).
 - `go test ./...`, `go vet ./...`, `golangci-lint run ./...`.
 - `go run ./cmd/migrate status|up|down` — needs `DATABASE_URL_UNPOOLED`.
 - `go run ./cmd/invite [n]` — prints n single-use invite codes; needs only

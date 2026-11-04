@@ -5,7 +5,7 @@ export function Privacy() {
     <article>
       <H1>Privacy</H1>
       <p className="mb-6 text-sm text-text-secondary">
-        Last updated 4 October 2026
+        Last updated 17 October 2026
       </p>
 
       <P>
@@ -17,10 +17,10 @@ export function Privacy() {
 
       <H2>Who we are</H2>
       <P>
-        Dayrule is run by Jon Hadfield, an individual based in the United
-        Kingdom, who is the data controller for the information below. Contact:{' '}
-        <a className="text-accent underline" href="mailto:jon@lessknown.co.uk">
-          jon@lessknown.co.uk
+        Dayrule is a to-do app operated from the United Kingdom. For privacy
+        questions, contact{' '}
+        <a className="text-accent underline" href="mailto:privacy@dayrule.app">
+          privacy@dayrule.app
         </a>
         .
       </P>

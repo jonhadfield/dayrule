@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -35,7 +36,12 @@ func run(logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
-	cfg := httpapi.Config{Version: version(), Logger: logger}
+	cfg := httpapi.Config{
+		Version:       version(),
+		Logger:        logger,
+		MinIOSBuild:   envInt("MIN_IOS_BUILD"),
+		MinMacOSBuild: envInt("MIN_MACOS_BUILD"),
+	}
 
 	if url := os.Getenv("DATABASE_URL"); url != "" {
 		pool, err := store.Open(ctx, url)
@@ -159,4 +165,17 @@ func version() string {
 		return sha[:7]
 	}
 	return "dev"
+}
+
+// envInt reads a positive integer env var; missing or invalid → 0 (unset).
+func envInt(name string) int {
+	v := strings.TrimSpace(os.Getenv(name))
+	if v == "" {
+		return 0
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n < 1 {
+		return 0
+	}
+	return n
 }

@@ -16,6 +16,7 @@ import {
 } from './session'
 import { unlockWithPasskey } from './passkey'
 import { confirmTwoStepReset, resetDate, startTwoStepReset } from './twostep'
+import { CoverWhenHidden } from './PrivacyCover'
 import { AuthShell, ErrorText, Field, LinkButton, Remember, Submit } from './ui'
 import { message, newPasswordProblem } from './validation'
 
@@ -482,28 +483,31 @@ function SignUp({ onCancel }: { onCancel: () => void }) {
 
   if (step === 'phrase' && pending) {
     return (
-      <AuthShell
-        title="Your recovery phrase"
-        subtitle="If you forget your password, these 24 words are the only way back into your account. Write them down and keep them somewhere safe. Nobody, including us, can recover your account without them."
-      >
-        <ol className="mb-5 grid grid-cols-2 gap-x-4 gap-y-1 rounded-[6px] border border-hairline bg-sidebar/50 p-3 font-mono text-sm sm:grid-cols-3">
-          {pending.recoveryWords.map((w, i) => (
-            <li key={i} className="flex gap-2">
-              <span className="w-5 text-right text-text-secondary">
-                {i + 1}
-              </span>
-              <span>{w}</span>
-            </li>
-          ))}
-        </ol>
-        <button
-          type="button"
-          onClick={() => setStep('confirm')}
-          className="w-full rounded-full bg-text px-4 py-2.5 font-medium text-bg hover:bg-accent"
+      <>
+        <AuthShell
+          title="Your recovery phrase"
+          subtitle="If you forget your password, these 24 words are the only way back into your account. Write them down and keep them somewhere safe. Nobody, including us, can recover your account without them."
         >
-          I’ve written them down
-        </button>
-      </AuthShell>
+          <ol className="mb-5 grid grid-cols-2 gap-x-4 gap-y-1 rounded-[6px] border border-hairline bg-sidebar/50 p-3 font-mono text-sm sm:grid-cols-3">
+            {pending.recoveryWords.map((w, i) => (
+              <li key={i} className="flex gap-2">
+                <span className="w-5 text-right text-text-secondary">
+                  {i + 1}
+                </span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ol>
+          <button
+            type="button"
+            onClick={() => setStep('confirm')}
+            className="w-full rounded-full bg-text px-4 py-2.5 font-medium text-bg hover:bg-accent"
+          >
+            I’ve written them down
+          </button>
+        </AuthShell>
+        <CoverWhenHidden />
+      </>
     )
   }
 
@@ -555,38 +559,43 @@ function ConfirmPhrase({
   )
 
   return (
-    <AuthShell
-      title="Check your recovery phrase"
-      subtitle="Type these words from your phrase."
-    >
-      <form onSubmit={(e) => (correct ? onConfirmed(e) : e.preventDefault())}>
-        <ErrorText error={error} />
-        {positions.map((p, i) => (
-          <Field
-            key={p}
-            label={`Word ${p + 1}`}
-            autoCapitalize="none"
-            autoComplete="off"
-            spellCheck={false}
-            required
-            value={answers[i]}
-            onChange={(e) =>
-              setAnswers((a) => a.map((x, j) => (j === i ? e.target.value : x)))
-            }
-          />
-        ))}
-        <Remember checked={remember} onChange={setRemember} />
-        {!correct && answers.every((a) => a.trim() !== '') && (
-          <p className="mb-3 text-sm text-deadline">
-            Those don’t match your phrase.
-          </p>
-        )}
-        <Submit busy={busy}>Create account</Submit>
-      </form>
-      <div className="mt-5">
-        <LinkButton onClick={onBack}>Show the phrase again</LinkButton>
-      </div>
-    </AuthShell>
+    <>
+      <AuthShell
+        title="Check your recovery phrase"
+        subtitle="Type these words from your phrase."
+      >
+        <form onSubmit={(e) => (correct ? onConfirmed(e) : e.preventDefault())}>
+          <ErrorText error={error} />
+          {positions.map((p, i) => (
+            <Field
+              key={p}
+              label={`Word ${p + 1}`}
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              required
+              value={answers[i]}
+              onChange={(e) =>
+                setAnswers((a) =>
+                  a.map((x, j) => (j === i ? e.target.value : x)),
+                )
+              }
+            />
+          ))}
+          <Remember checked={remember} onChange={setRemember} />
+          {!correct && answers.every((a) => a.trim() !== '') && (
+            <p className="mb-3 text-sm text-deadline">
+              Those don’t match your phrase.
+            </p>
+          )}
+          <Submit busy={busy}>Create account</Submit>
+        </form>
+        <div className="mt-5">
+          <LinkButton onClick={onBack}>Show the phrase again</LinkButton>
+        </div>
+      </AuthShell>
+      <CoverWhenHidden />
+    </>
   )
 }
 
@@ -601,65 +610,68 @@ function Recover({ onCancel }: { onCancel: () => void }) {
   const [remember, setRemember] = useState(false)
   const { busy, error, setError, run } = useSubmit()
   return (
-    <AuthShell
-      title="Reset your password"
-      subtitle="Use your 24-word recovery phrase. Your to-dos stay encrypted with the same key; only the password changes."
-    >
-      <form
-        onSubmit={run(async () => {
-          const problem = await newPasswordProblem(password, confirm)
-          if (problem) return setError(problem)
-          await recover(email, words, password, remember)
-        })}
+    <>
+      <AuthShell
+        title="Reset your password"
+        subtitle="Use your 24-word recovery phrase. Your to-dos stay encrypted with the same key; only the password changes."
       >
-        <ErrorText error={error} />
-        <Field
-          label="Email"
-          type="email"
-          autoComplete="username"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-        />
-        <label className="mb-3 block">
-          <span className="mb-1 block text-sm font-medium">
-            Recovery phrase
-          </span>
-          <textarea
+        <form
+          onSubmit={run(async () => {
+            const problem = await newPasswordProblem(password, confirm)
+            if (problem) return setError(problem)
+            await recover(email, words, password, remember)
+          })}
+        >
+          <ErrorText error={error} />
+          <Field
+            label="Email"
+            type="email"
+            autoComplete="username"
             required
-            rows={4}
-            autoCapitalize="none"
-            autoComplete="off"
-            spellCheck={false}
-            value={words}
-            onChange={(e) => setWords(e.target.value)}
-            placeholder="24 words, separated by spaces"
-            className="w-full rounded-[6px] border border-hairline bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
           />
-        </label>
-        <Field
-          label="New password"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          hint="At least 10 characters."
-        />
-        <Field
-          label="Confirm new password"
-          type="password"
-          autoComplete="new-password"
-          required
-          value={confirm}
-          onChange={(e) => setConfirm(e.target.value)}
-        />
-        <Remember checked={remember} onChange={setRemember} />
-        <Submit busy={busy}>Reset password</Submit>
-      </form>
-      <div className="mt-5">
-        <LinkButton onClick={onCancel}>Back to sign in</LinkButton>
-      </div>
-    </AuthShell>
+          <label className="mb-3 block">
+            <span className="mb-1 block text-sm font-medium">
+              Recovery phrase
+            </span>
+            <textarea
+              required
+              rows={4}
+              autoCapitalize="none"
+              autoComplete="off"
+              spellCheck={false}
+              value={words}
+              onChange={(e) => setWords(e.target.value)}
+              placeholder="24 words, separated by spaces"
+              className="w-full rounded-[6px] border border-hairline bg-bg px-3 py-2 font-mono text-sm outline-none focus:border-accent"
+            />
+          </label>
+          <Field
+            label="New password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            hint="At least 10 characters."
+          />
+          <Field
+            label="Confirm new password"
+            type="password"
+            autoComplete="new-password"
+            required
+            value={confirm}
+            onChange={(e) => setConfirm(e.target.value)}
+          />
+          <Remember checked={remember} onChange={setRemember} />
+          <Submit busy={busy}>Reset password</Submit>
+        </form>
+        <div className="mt-5">
+          <LinkButton onClick={onCancel}>Back to sign in</LinkButton>
+        </div>
+      </AuthShell>
+      <CoverWhenHidden />
+    </>
   )
 }

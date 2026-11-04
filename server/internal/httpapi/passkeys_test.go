@@ -8,11 +8,14 @@ import (
 	"encoding/base64"
 	"encoding/binary"
 	"encoding/json"
+	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+
+	"github.com/jonhadfield/dayrule/server/internal/store"
 )
 
 const testOrigin = "https://dayrule.test"
@@ -261,6 +264,21 @@ func TestPasskeySignIn(t *testing.T) {
 		}
 	})
 
+	t.Run("native client without Origin uses the sole RP", func(t *testing.T) {
+		c, token := passwordStep(t, hs, a)
+		c.origin = ""
+		c.header = "ios/2"
+		options(t, c.do("POST", "/api/v1/auth/login/passkey/options", map[string]string{"token": token}))
+	})
+
+	t.Run("web client without Origin is refused", func(t *testing.T) {
+		c, token := passwordStep(t, hs, a)
+		c.origin = ""
+		c.header = "web"
+		wantCode(t, "options", c.do("POST", "/api/v1/auth/login/passkey/options", map[string]string{"token": token}),
+			400, "passkey_origin")
+	})
+
 	t.Run("a copied passkey is refused", func(t *testing.T) {
 		c, token := passwordStep(t, hs, a)
 		clone := *key
@@ -357,5 +375,23 @@ func TestRecoveryNeedsNoPasskey(t *testing.T) {
 	})
 	if r.code != 200 || c.cookie == "" {
 		t.Errorf("recover = %d %v", r.code, r.body)
+	}
+}
+
+func TestPasskeysRPNativePrefersProduction(t *testing.T) {
+	p, err := NewPasskeys(store.Passkeys{}, []string{
+		"https://preview.dayrule.app", "https://dayrule.app",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest("POST", "/", nil)
+	req.Header.Set("X-Dayrule-Client", "macos/9")
+	wa, err := p.rp(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wa.Config.RPID != "dayrule.app" {
+		t.Fatalf("RPID = %q, want dayrule.app", wa.Config.RPID)
 	}
 }

@@ -66,7 +66,7 @@ record types and timestamps, is inside the ciphertext.
 
 | Threat | Mitigation | Where |
 |---|---|---|
-| Password guessing online | Per-account lockout with backoff; Vercel Firewall rate limits on auth endpoints (M7) | `httpapi/accounts.go` |
+| Password guessing online | Per-account lockout with backoff; Vercel Firewall rate limits on auth endpoints keyed by IP+JA4 (M7; decision 36) | `httpapi/accounts.go`, `docs/firewall.md` |
 | A phished or reused password | Optional second step (decision 30), checked before the server issues a session or the wrapped key: a passkey (the server verifies the WebAuthn assertion; RP ID = the exact host, so a look-alike site can't use it), or a TOTP code (secret sealed under a key from `AUTH_SECRET`, each 30-second step accepted once), or a single-use backup code (keyed HMAC). Adding or removing any of them needs the password and emails a notice, as does using a backup code; the recovery phrase still counts as both factors. TOTP and backup codes can be phished in real time, unlike a passkey, so the UI lists passkeys first | `httpapi/passkeys.go`, `httpapi/twostep.go` |
 | Removing the second step with a stolen password and email access | The reset by email waits 7 days, with notices when asked, a day before and when done; signing in with a second step, a new password or Account cancels it. Email access alone still decrypts nothing, and codes are sent only after the password | `httpapi/twostep.go` |
 | Guessing a second-step code with a stolen password | 5 codes per sign-in attempt, and a lockout across attempts with back-off that a correct password doesn't reset; about 3 in a million chance per TOTP guess | `httpapi/twostep.go`, `store/twostep.go` |
@@ -94,7 +94,8 @@ record types and timestamps, is inside the ciphertext.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Storage abuse | Quotas: 50 MB, 100,000 records, 64 KB per record | `store/records.go` |
-| Sign-up spam | Invite-only until launch; email verification; rate limits | `httpapi/accounts.go` |
+| Sign-up spam | Invite-only until launch; email verification; Firewall rate limits (IP+JA4); no BotID challenge (decisions 25, 36) | `httpapi/accounts.go`, `docs/firewall.md` |
+| CGNAT / shared public IP exhausting auth budgets | Rate-limit keys `ip`+`ja4`, not IP alone; no spoofable `X-Dayrule-Client` exemption | `docs/firewall.md`, PLAN decision 36 |
 | Cron endpoints called by others | Bearer `CRON_SECRET`, compared in constant time | `httpapi/sync.go`, `httpapi/reminders.go` |
 
 ## Residual risks
