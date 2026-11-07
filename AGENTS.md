@@ -12,6 +12,8 @@ changes.
 - `server/` — Go API (`cmd/dayruled`), migrations (`migrations/`, goose,
   embedded), migration runner (`cmd/migrate`), local CLI/MCP (`cmd/dayrule`;
   see `docs/cli-mcp.md`).
+- `tools/things-export/` — read-only Things 3 → JSON exporter (PLAN §8.3;
+  import via Account → Your data).
 - `vercel.json` — Vercel Services: `web` (static) and `api` (Go Function);
   `/api/*` goes to the API, everything else to the SPA.
 
@@ -47,6 +49,12 @@ From `server/`:
   `docker run --rm -d --name dayrule-test-pg -p 55432:5432 -e POSTGRES_PASSWORD=test -e POSTGRES_DB=dayrule_test postgres:18`
   then `TEST_DATABASE_URL=postgres://postgres:test@localhost:55432/dayrule_test?sslmode=disable go test ./...`.
   CI runs a Postgres service.
+
+From `tools/things-export/`:
+
+- `go run . -o things.json` — export Things 3 (discovers the Mac DB, or
+  pass `-db` to `main.sqlite`). See `tools/things-export/README.md`.
+- `go test ./...` — fixture + date packing tests.
 
 CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 
