@@ -803,9 +803,9 @@ function Data() {
       <P>
         Mapping happens in the browser; the server never sees the plaintext.
         Areas, projects, headings, to-dos, checklists, tags, When/Deadline and
-        the Logbook (as Done) come across. Things repeat rules are imported as a
-        simple daily template you can edit — complex schedules may need a quick
-        fix in Dayrule.
+        the Logbook (as Done) come across. Things day / week / month / year
+        repeats (including weekly days and after-completion) map into Dayrule;
+        unusual schedules may still need a quick edit.
       </P>
       <H2>Delete your account</H2>
       <P>

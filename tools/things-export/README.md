@@ -41,8 +41,9 @@ Then in Dayrule (web): Account → Your data → Import JSON… and choose
 
 Areas, projects, headings, to-dos, checklists, tags, When / Deadline, Inbox /
 Anytime / Someday, and Logbook (completed / canceled). Repeating templates
-become a simple daily Dayrule repeat you can edit; Things’ opaque recurrence
-blob is not fully decoded.
+decode Things’ `rt1_recurrenceRule` plist into Dayrule day / week / month /
+year rules (including weekly weekdays and after-completion). Unsupported
+shapes still fall back to a daily template you can edit.
 
 ## Schema versions
 

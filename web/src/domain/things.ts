@@ -86,6 +86,11 @@ interface ThingsTodo {
   repeatTemplate?: boolean
   repeatNext?: LocalDate
   afterCompletion?: boolean
+  /** Decoded from Things' recurrence plist (`fu` / `fa` / `of`). */
+  repeatFreq?: Repeat['freq']
+  repeatEvery?: number
+  /** Dayrule weekdays: 0 = Monday … 6 = Sunday. */
+  repeatWeekdays?: number[]
   createdAt: string
   updatedAt: string
 }
@@ -195,9 +200,24 @@ function asRepeat(t: ThingsTodo): Repeat | undefined {
   if (!t.repeatTemplate) return undefined
   const anchor = t.repeatNext ?? t.startDate ?? t.createdAt.slice(0, 10)
   if (!/^\d{4}-\d{2}-\d{2}$/.test(anchor)) return undefined
+  const freq = t.repeatFreq ?? 'day'
+  const every =
+    typeof t.repeatEvery === 'number' &&
+    Number.isInteger(t.repeatEvery) &&
+    t.repeatEvery >= 1
+      ? t.repeatEvery
+      : 1
+  const weekdays =
+    freq === 'week' &&
+    Array.isArray(t.repeatWeekdays) &&
+    t.repeatWeekdays.length > 0 &&
+    t.repeatWeekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)
+      ? [...new Set(t.repeatWeekdays)].sort((a, b) => a - b)
+      : undefined
   return {
-    freq: 'day',
-    every: 1,
+    freq,
+    every,
+    ...(weekdays ? { weekdays } : {}),
     mode: t.afterCompletion ? 'afterCompletion' : 'fixed',
     anchor,
     next: t.afterCompletion ? undefined : (t.repeatNext ?? anchor),

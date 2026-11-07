@@ -41,7 +41,7 @@ func TestExportMinimalFixture(t *testing.T) {
 	if len(doc.Headings) != 1 || doc.Headings[0].Title != "Morning" {
 		t.Fatalf("headings: %+v", doc.Headings)
 	}
-	if len(doc.Todos) != 4 {
+	if len(doc.Todos) != 5 {
 		t.Fatalf("todos: %d %+v", len(doc.Todos), doc.Todos)
 	}
 	byID := map[string]thingsTodo{}
@@ -63,6 +63,16 @@ func TestExportMinimalFixture(t *testing.T) {
 	someday := byID["todo-later"]
 	if someday.Start != "later" {
 		t.Fatalf("someday: %+v", someday)
+	}
+	rep := byID["todo-repeat"]
+	if !rep.RepeatTemplate || rep.RepeatFreq != "week" || rep.RepeatEvery != 2 {
+		t.Fatalf("repeat: %+v", rep)
+	}
+	if len(rep.RepeatWeekdays) != 2 || rep.RepeatWeekdays[0] != 0 || rep.RepeatWeekdays[1] != 2 {
+		t.Fatalf("repeat weekdays: %v", rep.RepeatWeekdays)
+	}
+	if rep.RepeatNext == nil || *rep.RepeatNext != "2026-11-10" {
+		t.Fatalf("repeat next: %+v", rep.RepeatNext)
 	}
 	if len(doc.ChecklistItems) != 1 || !doc.ChecklistItems[0].Done {
 		t.Fatalf("checklist: %+v", doc.ChecklistItems)
@@ -248,6 +258,22 @@ func mustCreateFixture(t *testing.T, path string) {
 			0, 0, 0, 'Someday read', '', 2, 3, 'area-1'
 		)
 	`)
+	// Weekly Mon+Wed (Things wd 1,3), every 2 weeks; next = pack(2026,11,10).
+	rule := recurrencePlistForTest(256, 2, 0, []int{1, 3})
+	nextPacked := (2026 << 16) | (11 << 12) | (10 << 7)
+	if _, err := db.Exec(`
+		INSERT INTO TMTask(
+			uuid, leavesTombstone, creationDate, userModificationDate,
+			type, status, trashed, title, notes, start, "index",
+			rt1_recurrenceRule, rt1_nextInstanceStartDate
+		) VALUES (
+			'todo-repeat', 0, 1715000000, 1715000100,
+			0, 0, 0, 'Gym', '', 1, 4,
+			?, ?
+		)
+	`, rule, nextPacked); err != nil {
+		t.Fatal(err)
+	}
 	mustExec(t, db, `INSERT INTO TMTaskTag(tasks, tags) VALUES ('todo-inbox', 'tag-1')`)
 	mustExec(t, db, `
 		INSERT INTO TMChecklistItem(

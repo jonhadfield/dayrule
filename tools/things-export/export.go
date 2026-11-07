@@ -97,8 +97,12 @@ type thingsTodo struct {
 	RepeatTemplate  bool     `json:"repeatTemplate,omitempty"`
 	RepeatNext      *string  `json:"repeatNext,omitempty"`
 	AfterCompletion bool     `json:"afterCompletion,omitempty"`
-	CreatedAt       string   `json:"createdAt"`
-	UpdatedAt       string   `json:"updatedAt"`
+	// Decoded from rt1_recurrenceRule when the blob is a known Things plist.
+	RepeatFreq     string `json:"repeatFreq,omitempty"`     // day|week|month|year
+	RepeatEvery    int    `json:"repeatEvery,omitempty"`    // every N units (≥1)
+	RepeatWeekdays []int  `json:"repeatWeekdays,omitempty"` // Dayrule Mon=0…Sun=6
+	CreatedAt      string `json:"createdAt"`
+	UpdatedAt      string `json:"updatedAt"`
 }
 
 type thingsChecklist struct {
@@ -308,11 +312,11 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 	if cols["leavestombstone"] {
 		where = `IFNULL(leavesTombstone, 0) = 0`
 	}
-	repeatExpr := "0"
+	ruleExpr := "NULL"
 	nextExpr := "NULL"
 	afterExpr := "0"
 	if cols["rt1_recurrencerule"] {
-		repeatExpr = `CASE WHEN rt1_recurrenceRule IS NOT NULL THEN 1 ELSE 0 END`
+		ruleExpr = `rt1_recurrenceRule`
 	}
 	if cols["rt1_nextinstancestartdate"] {
 		nextExpr = `rt1_nextInstanceStartDate`
@@ -350,7 +354,7 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 		FROM TMTask
 		WHERE %s
 		ORDER BY "index", title
-	`, reminderExpr, repeatExpr, nextExpr, afterExpr, where))
+	`, reminderExpr, ruleExpr, nextExpr, afterExpr, where))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("TMTask: %w", err)
 	}
@@ -368,7 +372,8 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 			area, project, heading             sql.NullString
 			created, modified                  float64
 			stopDate, reminderTime             sql.NullFloat64
-			isRepeat, afterCompletion          int
+			ruleBlob                           []byte
+			afterCompletion                    int
 			nextInstance                       sql.NullInt64
 		)
 		if err := rows.Scan(
@@ -376,10 +381,11 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 			&startDate, &deadline, &index, &todayIndex,
 			&area, &project, &heading,
 			&created, &modified, &stopDate, &reminderTime,
-			&isRepeat, &nextInstance, &afterCompletion,
+			&ruleBlob, &nextInstance, &afterCompletion,
 		); err != nil {
 			return nil, nil, nil, err
 		}
+		isRepeat := len(ruleBlob) > 0
 
 		createdAt := unixToRFC3339(created)
 		updatedAt := unixToRFC3339(modified)
@@ -449,10 +455,18 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 				Start:           mapTodoStart(start),
 				Order:           index,
 				TagIDs:          tags,
-				RepeatTemplate:  isRepeat != 0,
+				RepeatTemplate:  isRepeat,
 				AfterCompletion: afterCompletion != 0,
 				CreatedAt:       createdAt,
 				UpdatedAt:       updatedAt,
+			}
+			if decoded, ok := parseRecurrenceRule(ruleBlob); ok {
+				t.RepeatFreq = decoded.Freq
+				t.RepeatEvery = decoded.Every
+				t.RepeatWeekdays = decoded.Weekdays
+				if decoded.After {
+					t.AfterCompletion = true
+				}
 			}
 			if project.Valid && project.String != "" {
 				t.ProjectID = &project.String
