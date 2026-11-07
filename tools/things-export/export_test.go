@@ -69,6 +69,52 @@ func TestExportMinimalFixture(t *testing.T) {
 	}
 }
 
+func TestExportAreaWithoutLeavesTombstone(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "main.sqlite")
+	db := mustOpenRW(t, path)
+	mustExec(t, db, `
+		CREATE TABLE Meta (key TEXT PRIMARY KEY, value TEXT);
+		CREATE TABLE TMArea (uuid TEXT PRIMARY KEY, title TEXT, "index" INTEGER);
+		CREATE TABLE TMTag (uuid TEXT PRIMARY KEY, title TEXT, "index" INTEGER, parent TEXT);
+		CREATE TABLE TMTaskTag (tasks TEXT, tags TEXT);
+		CREATE TABLE TMTask (
+			uuid TEXT PRIMARY KEY,
+			creationDate REAL,
+			userModificationDate REAL,
+			type INTEGER,
+			status INTEGER,
+			trashed INTEGER,
+			title TEXT,
+			notes TEXT,
+			start INTEGER,
+			startDate INTEGER,
+			deadline INTEGER,
+			"index" INTEGER,
+			todayIndex INTEGER,
+			area TEXT,
+			project TEXT,
+			heading TEXT,
+			stopDate REAL
+		);
+	`)
+	mustExec(t, db, `INSERT INTO Meta(key, value) VALUES ('databaseVersion', '21')`)
+	mustExec(t, db, `INSERT INTO TMArea(uuid, title, "index") VALUES ('area-1', 'Personal', 0)`)
+	_ = db.Close()
+
+	ro, err := openThingsDB(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = ro.Close() })
+	doc, err := exportThings(ro, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(doc.Areas) != 1 || doc.Areas[0].Title != "Personal" {
+		t.Fatalf("areas: %+v", doc.Areas)
+	}
+}
+
 func TestRejectUnsupportedSchema(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "main.sqlite")
 	db := mustOpenRW(t, path)

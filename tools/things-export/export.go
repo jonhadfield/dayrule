@@ -227,11 +227,19 @@ func loadTags(db *sql.DB) ([]thingsTag, error) {
 }
 
 func loadAreas(db *sql.DB, areaTags map[string][]string) ([]thingsArea, error) {
-	rows, err := db.Query(`
-		SELECT uuid, IFNULL(title, ''), IFNULL("index", 0), IFNULL(leavesTombstone, 0)
+	cols, err := tableColumns(db, "TMArea")
+	if err != nil {
+		return nil, fmt.Errorf("TMArea: %w", err)
+	}
+	tombExpr := "0"
+	if cols["leavestombstone"] {
+		tombExpr = `IFNULL(leavesTombstone, 0)`
+	}
+	rows, err := db.Query(fmt.Sprintf(`
+		SELECT uuid, IFNULL(title, ''), IFNULL("index", 0), %s
 		FROM TMArea
 		ORDER BY "index", title
-	`)
+	`, tombExpr))
 	if err != nil {
 		return nil, fmt.Errorf("TMArea: %w", err)
 	}
@@ -292,7 +300,31 @@ func loadAreaTags(db *sql.DB) (map[string][]string, error) {
 }
 
 func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thingsHeading, []thingsTodo, error) {
-	rows, err := db.Query(`
+	cols, err := tableColumns(db, "TMTask")
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("TMTask: %w", err)
+	}
+	where := "1=1"
+	if cols["leavestombstone"] {
+		where = `IFNULL(leavesTombstone, 0) = 0`
+	}
+	repeatExpr := "0"
+	nextExpr := "NULL"
+	afterExpr := "0"
+	if cols["rt1_recurrencerule"] {
+		repeatExpr = `CASE WHEN rt1_recurrenceRule IS NOT NULL THEN 1 ELSE 0 END`
+	}
+	if cols["rt1_nextinstancestartdate"] {
+		nextExpr = `rt1_nextInstanceStartDate`
+	}
+	if cols["rt1_aftercompletionreferencedate"] {
+		afterExpr = `CASE WHEN rt1_afterCompletionReferenceDate IS NOT NULL THEN 1 ELSE 0 END`
+	}
+	reminderExpr := "NULL"
+	if cols["remindertime"] {
+		reminderExpr = `reminderTime`
+	}
+	rows, err := db.Query(fmt.Sprintf(`
 		SELECT
 			uuid,
 			IFNULL(type, 0),
@@ -311,14 +343,14 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 			IFNULL(creationDate, 0),
 			IFNULL(userModificationDate, 0),
 			stopDate,
-			reminderTime,
-			CASE WHEN rt1_recurrenceRule IS NOT NULL THEN 1 ELSE 0 END,
-			rt1_nextInstanceStartDate,
-			CASE WHEN rt1_afterCompletionReferenceDate IS NOT NULL THEN 1 ELSE 0 END
+			%s,
+			%s,
+			%s,
+			%s
 		FROM TMTask
-		WHERE IFNULL(leavesTombstone, 0) = 0
+		WHERE %s
 		ORDER BY "index", title
-	`)
+	`, reminderExpr, repeatExpr, nextExpr, afterExpr, where))
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("TMTask: %w", err)
 	}
@@ -477,7 +509,18 @@ func loadTasks(db *sql.DB, taskTags map[string][]string) ([]thingsProject, []thi
 }
 
 func loadChecklist(db *sql.DB) ([]thingsChecklist, error) {
-	rows, err := db.Query(`
+	cols, err := tableColumns(db, "TMChecklistItem")
+	if err != nil {
+		if isMissingTable(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("TMChecklistItem: %w", err)
+	}
+	where := "1=1"
+	if cols["leavestombstone"] {
+		where = `IFNULL(leavesTombstone, 0) = 0`
+	}
+	rows, err := db.Query(fmt.Sprintf(`
 		SELECT
 			uuid,
 			IFNULL(task, ''),
@@ -487,9 +530,9 @@ func loadChecklist(db *sql.DB) ([]thingsChecklist, error) {
 			IFNULL(creationDate, 0),
 			IFNULL(userModificationDate, 0)
 		FROM TMChecklistItem
-		WHERE IFNULL(leavesTombstone, 0) = 0
+		WHERE %s
 		ORDER BY "index", title
-	`)
+	`, where))
 	if err != nil {
 		if isMissingTable(err) {
 			return nil, nil
@@ -556,6 +599,37 @@ func isMissingTable(err error) bool {
 	return err != nil && strings.Contains(strings.ToLower(err.Error()), "no such table")
 }
 
+// tableColumns returns lowercased column names for table (empty map if missing).
+func tableColumns(db *sql.DB, table string) (map[string]bool, error) {
+	rows, err := db.Query(`PRAGMA table_info(` + quoteIdent(table) + `)`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := map[string]bool{}
+	for rows.Next() {
+		var cid int
+		var name, typ string
+		var notnull, pk int
+		var dflt sql.NullString
+		if err := rows.Scan(&cid, &name, &typ, &notnull, &dflt, &pk); err != nil {
+			return nil, err
+		}
+		out[strings.ToLower(name)] = true
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(out) == 0 {
+		return nil, fmt.Errorf("no such table: %s", table)
+	}
+	return out, nil
+}
+
+func quoteIdent(name string) string {
+	return `"` + strings.ReplaceAll(name, `"`, `""`) + `"`
+}
+
 func writeExport(path string, doc *thingsExport) error {
 	data, err := json.MarshalIndent(doc, "", "  ")
 	if err != nil {
@@ -574,20 +648,61 @@ func defaultThingsDBPath() (string, error) {
 	if err != nil {
 		return "", err
 	}
-	pattern := filepath.Join(
-		home,
-		"Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac",
-		"ThingsData-*",
-		"Things Database.thingsdatabase",
-		"main.sqlite",
+	group := filepath.Join(
+		home, "Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac",
 	)
-	matches, err := filepath.Glob(pattern)
-	if err != nil {
-		return "", err
+	patterns := []string{
+		// Things 3.17.4+ (things.py DEFAULT_FILEPATH_31704015).
+		filepath.Join(group, "ThingsData-*", "Things Database.thingsdatabase", "main.sqlite"),
+		// Things 3.15–3.17.3 (no ThingsData-* wrapper).
+		filepath.Join(group, "Things Database.thingsdatabase", "main.sqlite"),
+		// Alternate package spelling inside ThingsData-*.
+		filepath.Join(group, "ThingsData-*", "Things Database.thingsdatabase", "ThingsDatabase.sqlite*"),
+		// Older sandboxed layout.
+		filepath.Join(
+			home,
+			"Library/Containers/com.culturedcode.ThingsMac/Data/Library/Application Support/Cultured Code",
+			"Things*",
+			"Things.sqlite*",
+		),
 	}
-	if len(matches) == 0 {
-		return "", fmt.Errorf("no Things database found under %s (pass -db PATH)", pattern)
+
+	var found []string
+	for _, pattern := range patterns {
+		matches, err := filepath.Glob(pattern)
+		if err != nil {
+			return "", err
+		}
+		found = append(found, matches...)
 	}
-	// Prefer the lexicographically last ThingsData-* folder.
-	return matches[len(matches)-1], nil
+	if len(found) > 0 {
+		// Prefer the lexicographically last path (newest ThingsData-* etc.).
+		return found[len(found)-1], nil
+	}
+
+	groupDir := filepath.Join(home, "Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac")
+	if _, err := os.Stat(groupDir); err != nil {
+		if os.IsPermission(err) || strings.Contains(err.Error(), "operation not permitted") {
+			return "", fmt.Errorf(
+				"macOS blocked reading %s (Full Disk Access). Run this in Terminal.app, or grant FDA to your terminal, or pass -db PATH to main.sqlite",
+				groupDir,
+			)
+		}
+	} else if entries, err := os.ReadDir(groupDir); err != nil {
+		if os.IsPermission(err) || strings.Contains(err.Error(), "operation not permitted") {
+			return "", fmt.Errorf(
+				"macOS blocked reading %s (Full Disk Access). Run this in Terminal.app, or grant FDA to your terminal, or pass -db PATH to main.sqlite",
+				groupDir,
+			)
+		}
+	} else if len(entries) == 0 {
+		return "", fmt.Errorf(
+			"Things group container is empty at %s — open Things once so it creates ThingsData-*, or pass -db PATH",
+			groupDir,
+		)
+	}
+
+	return "", fmt.Errorf(
+		"no Things database found (tried group-container and Containers paths). Find it with:\n  find ~/Library/Group\\ Containers/JLMPQHK86H.com.culturedcode.ThingsMac -name 'main.sqlite' 2>/dev/null\nthen: go run . -db \"/path/to/main.sqlite\" -o things.json",
+	)
 }

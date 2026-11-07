@@ -21,6 +21,19 @@ Default discovery looks under:
 
 `~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/ThingsData-*/Things Database.thingsdatabase/main.sqlite`
 
+(and an older `Containers/com.culturedcode.ThingsMac/…/Things.sqlite*` path).
+
+**macOS privacy:** that Group Container is protected. If discovery fails with
+“operation not permitted” or “no Things database found”, run the command in
+**Terminal.app** (not a sandboxed IDE terminal), or grant the terminal **Full
+Disk Access**, or pass `-db` explicitly:
+
+```bash
+find ~/Library/Group\ Containers/JLMPQHK86H.com.culturedcode.ThingsMac \
+  -name 'main.sqlite' 2>/dev/null
+go run . -db "/path/from/find/main.sqlite" -o things.json
+```
+
 Then in Dayrule (web): Account → Your data → Import JSON… and choose
 `things.json`.
 
