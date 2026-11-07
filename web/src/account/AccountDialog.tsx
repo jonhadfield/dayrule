@@ -907,7 +907,9 @@ function DataSection() {
       <p className="mb-3 text-sm text-text-secondary">
         Exports are made on this device and are <strong>not encrypted</strong>:
         anyone with the file can read it. Importing adds a copy and never
-        replaces what’s here.
+        replaces what’s here. To bring in Things 3, run{' '}
+        <code className="text-xs">things-export</code> on your Mac (see Help →
+        Your data), then import the JSON here — mapping stays on this device.
       </p>
       <Done text={done} />
       <ErrorText error={error} />

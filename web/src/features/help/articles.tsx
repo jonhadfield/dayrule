@@ -785,6 +785,27 @@ function Data() {
         <strong> Import JSON</strong> adds a copy of a Dayrule export and never
         replaces what’s there.
       </P>
+      <H2>Import from Things 3</H2>
+      <P>
+        On a Mac that has Things 3, run the read-only exporter from the Dayrule
+        repo:
+      </P>
+      <List>
+        <li>
+          <K>cd tools/things-export && go run . -o things.json</K> (or pass{' '}
+          <K>-db</K> to the Things <K>main.sqlite</K> path).
+        </li>
+        <li>
+          In Dayrule, Account → Your data → Import JSON… and choose that file.
+        </li>
+      </List>
+      <P>
+        Mapping happens in the browser; the server never sees the plaintext.
+        Areas, projects, headings, to-dos, checklists, tags, When/Deadline and
+        the Logbook (as Done) come across. Things repeat rules are imported as a
+        simple daily template you can edit — complex schedules may need a quick
+        fix in Dayrule.
+      </P>
       <H2>Delete your account</H2>
       <P>
         Account → Delete account. It deletes everything we hold, straight away,
