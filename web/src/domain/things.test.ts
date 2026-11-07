@@ -115,6 +115,22 @@ function sampleThings(): ThingsExportData {
         createdAt: '2026-11-01T00:00:00.000Z',
         updatedAt: '2026-11-01T00:00:00.000Z',
       },
+      {
+        id: 'todo-weekly',
+        title: 'Gym',
+        notes: '',
+        status: 'open',
+        start: 'ready',
+        order: 5,
+        repeatTemplate: true,
+        repeatNext: '2026-11-10',
+        afterCompletion: false,
+        repeatFreq: 'week',
+        repeatEvery: 2,
+        repeatWeekdays: [0, 2],
+        createdAt: '2026-11-01T00:00:00.000Z',
+        updatedAt: '2026-11-01T00:00:00.000Z',
+      },
     ],
     checklistItems: [
       {
@@ -143,12 +159,22 @@ describe('Things import', () => {
       mode: 'fixed',
       anchor: '2026-11-08',
     })
+    expect(
+      data.todos.find((t) => t.id === 'todo-weekly')?.repeat,
+    ).toMatchObject({
+      freq: 'week',
+      every: 2,
+      weekdays: [0, 2],
+      mode: 'fixed',
+      anchor: '2026-11-10',
+      next: '2026-11-10',
+    })
 
     const store = createEntityStore(undefined, clock())
     const counts = store.run('Import', (d, env) =>
       cmd.importData(d, env, parseImport(json)),
     )
-    expect(counts.todos).toBe(5)
+    expect(counts.todos).toBe(6)
     expect(counts.checklistItems).toBe(1)
     expect(inbox(store.entities, ctx).some((t) => t.title === 'Buy milk')).toBe(
       true,
