@@ -148,9 +148,13 @@ function sampleThings(): ThingsExportData {
 
 describe('Things import', () => {
   it('parses and maps into Dayrule lists', () => {
+    const today = '2026-11-07'
     const json = JSON.stringify(sampleThings())
-    const data = mapThingsToExport(parseThingsExport(json))
+    const data = mapThingsToExport(parseThingsExport(json), today)
     expect(data.areas).toHaveLength(1)
+    const sched = data.todos.find((t) => t.id === 'todo-sched')
+    expect(sched).toBeDefined()
+    expect(sched?.startDate).toBeUndefined()
     expect(
       data.todos.find((t) => t.id === 'todo-repeat')?.repeat,
     ).toMatchObject({
@@ -172,7 +176,7 @@ describe('Things import', () => {
 
     const store = createEntityStore(undefined, clock())
     const counts = store.run('Import', (d, env) =>
-      cmd.importData(d, env, parseImport(json)),
+      cmd.importData(d, env, parseImport(json, today)),
     )
     expect(counts.todos).toBe(6)
     expect(counts.checklistItems).toBe(1)
@@ -189,6 +193,33 @@ describe('Things import', () => {
         (t) => t.title === 'Old completed' && t.status === 'completed',
       ),
     ).toBe(true)
+    expect(
+      Object.values(store.entities.todos).some(
+        (t) => t.title === 'Scheduled chore' && t.startDate === undefined,
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps today and future When dates', () => {
+    const today = '2026-11-07'
+    const src = sampleThings()
+    src.todos.push({
+      id: 'todo-future',
+      title: 'Next month',
+      notes: '',
+      status: 'open',
+      start: 'ready',
+      startDate: '2026-12-01',
+      order: 6,
+      createdAt: '2026-11-01T00:00:00.000Z',
+      updatedAt: '2026-11-01T00:00:00.000Z',
+    })
+    src.projects[0]!.startDate = today
+    const data = mapThingsToExport(src, today)
+    expect(data.todos.find((t) => t.id === 'todo-future')?.startDate).toBe(
+      '2026-12-01',
+    )
+    expect(data.projects.find((p) => p.id === 'proj-1')?.startDate).toBe(today)
   })
 
   it('rejects the wrong format version', () => {

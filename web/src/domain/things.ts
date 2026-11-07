@@ -3,6 +3,7 @@
 // this intermediate JSON; the browser maps it to dayrule-export records and
 // encrypts on save via importData.
 
+import { toLocalDate } from './dates'
 import { keysBetween } from './order'
 import type {
   Area,
@@ -19,6 +20,14 @@ import type {
   Todo,
 } from './types'
 import type { ExportData } from './exchange'
+
+/** Keep When dates that are today or later; past dates flood Today as overdue. */
+export function keepStartDate(
+  date: LocalDate | undefined,
+  today: LocalDate,
+): LocalDate | undefined {
+  return date !== undefined && date >= today ? date : undefined
+}
 
 export const THINGS_EXPORT_FORMAT = 'dayrule-things-export'
 export const THINGS_EXPORT_VERSION = 1
@@ -226,9 +235,13 @@ function asRepeat(t: ThingsTodo): Repeat | undefined {
 
 /**
  * Map a Things export into dayrule-export records (Things UUIDs kept as ids;
- * importData mints fresh ids on apply).
+ * importData mints fresh ids on apply). Past `startDate` values (historical
+ * When) are dropped so items land in Backlog instead of flooding Today.
  */
-export function mapThingsToExport(src: ThingsExportData): ExportData {
+export function mapThingsToExport(
+  src: ThingsExportData,
+  today: LocalDate = toLocalDate(new Date()),
+): ExportData {
   const tagOrder = orderKeysFor(src.tags)
   const areaOrder = orderKeysFor(src.areas)
   const projectOrder = orderKeysFor(src.projects)
@@ -275,7 +288,7 @@ export function mapThingsToExport(src: ThingsExportData): ExportData {
     areaId: p.areaId && areaIds.has(p.areaId) ? (p.areaId as ID) : undefined,
     status: p.status,
     start: p.start,
-    startDate: p.startDate,
+    startDate: keepStartDate(p.startDate, today),
     tonight: false,
     deadline: p.deadline,
     tagIds: (p.tagIds ?? []).filter((id) => tagIds.has(id)) as ID[],
@@ -323,7 +336,7 @@ export function mapThingsToExport(src: ThingsExportData): ExportData {
           : undefined,
       status: t.status,
       start: t.start,
-      startDate: repeat ? undefined : t.startDate,
+      startDate: repeat ? undefined : keepStartDate(t.startDate, today),
       tonight: false,
       deadline: t.deadline,
       tagIds: (t.tagIds ?? []).filter((id) => tagIds.has(id)) as ID[],
