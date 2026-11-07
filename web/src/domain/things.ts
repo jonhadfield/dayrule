@@ -211,9 +211,7 @@ function asRepeat(t: ThingsTodo): Repeat | undefined {
     freq === 'week' &&
     Array.isArray(t.repeatWeekdays) &&
     t.repeatWeekdays.length > 0 &&
-    t.repeatWeekdays.every(
-      (d) => Number.isInteger(d) && d >= 0 && d <= 6,
-    )
+    t.repeatWeekdays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)
       ? [...new Set(t.repeatWeekdays)].sort((a, b) => a - b)
       : undefined
   return {
