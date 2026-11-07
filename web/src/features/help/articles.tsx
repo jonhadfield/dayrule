@@ -781,7 +781,8 @@ function Data() {
       <P>
         Account → Your data. <strong>Export JSON</strong> saves everything in a
         file you can import again; <strong>Export Markdown</strong> saves a
-        readable outline. Exports aren’t encrypted, so keep them safe.
+        readable outline. Both are built in your browser — not on Dayrule’s
+        servers — and the files aren’t encrypted, so keep them safe.
         <strong> Import JSON</strong> adds a copy of a Dayrule export and never
         replaces what’s there.
       </P>

@@ -905,11 +905,13 @@ function DataSection() {
   return (
     <Section title="Your data">
       <p className="mb-3 text-sm text-text-secondary">
-        Exports are made on this device and are <strong>not encrypted</strong>:
-        anyone with the file can read it. Importing adds a copy and never
-        replaces what’s here. To bring in Things 3, run{' '}
+        Exports are built in <strong>this browser</strong> (Dayrule’s servers
+        never see them) and the file is <strong>not encrypted</strong>: anyone
+        with it can read your lists. Importing adds a copy here and never
+        replaces what’s already in the vault. To bring in Things 3, run{' '}
         <code className="text-xs">things-export</code> on your Mac (see Help →
-        Your data), then import the JSON here — mapping stays on this device.
+        Your data), then import the JSON here — mapping also stays in this
+        browser.
       </p>
       <Done text={done} />
       <ErrorText error={error} />
