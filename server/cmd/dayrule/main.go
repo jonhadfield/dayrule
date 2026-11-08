@@ -6,6 +6,8 @@
 //
 //	go run ./cmd/dayrule inbox
 //	go run ./cmd/dayrule today
+//	go run ./cmd/dayrule backlog
+//	go run ./cmd/dayrule scheduled
 //	go run ./cmd/dayrule add "Buy milk"
 //	go run ./cmd/dayrule complete "Buy milk"
 //	go run ./cmd/dayrule schedule "Buy milk"
@@ -67,6 +69,18 @@ func main() {
 			fatal(err)
 		}
 		printTodos(v.Today(time.Now().Format("2006-01-02")))
+	case "backlog":
+		v, err := s.PullVault(ctx)
+		if err != nil {
+			fatal(err)
+		}
+		printTodos(v.Backlog(time.Now().Format("2006-01-02")))
+	case "scheduled":
+		v, err := s.PullVault(ctx)
+		if err != nil {
+			fatal(err)
+		}
+		printTodos(v.Scheduled(time.Now().Format("2006-01-02")))
 	case "add":
 		title := strings.TrimSpace(strings.Join(args, " "))
 		t, err := s.AddInbox(ctx, title)
@@ -127,6 +141,8 @@ Usage:
   dayrule doctor
   dayrule inbox
   dayrule today
+  dayrule backlog
+  dayrule scheduled
   dayrule add <title>
   dayrule complete <id-or-title>
   dayrule schedule <id-or-title>
