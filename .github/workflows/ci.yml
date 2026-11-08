@@ -69,6 +69,22 @@ jobs:
           version: v2.14.0
           working-directory: server
 
+  things-export:
+    name: things-export
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tools/things-export
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: tools/things-export/go.mod
+          cache-dependency-path: tools/things-export/go.sum
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+      - run: go test ./...
+
   e2e:
     name: e2e
     runs-on: ubuntu-latest

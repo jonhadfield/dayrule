@@ -411,6 +411,150 @@ export function createProject(
   return project
 }
 
+/**
+ * Turn a to-do into a project (PLAN.md §8.2). Checklist items become to-dos
+ * in the new project; the original to-do is removed.
+ */
+export function convertTodoToProject(d: Draft, env: Env, todoId: ID): Project {
+  const t = d.get('todos', todoId)
+  if (!t) throw new Error('to-do not found')
+  const siblings = d.all('projects').filter((p) => p.areaId === t.areaId)
+  const status: Status = t.status === 'canceled' ? 'open' : t.status
+  const project: Project = {
+    type: 'project',
+    id: env.newId(),
+    createdAt: stamp(env),
+    updatedAt: stamp(env),
+    title: t.title,
+    notes: t.notes,
+    status,
+    start: t.start === 'inbox' ? 'ready' : (t.start as Project['start']),
+    tonight: false,
+    tagIds: [...t.tagIds],
+    order: keyAfterLast(siblings.map((p) => p.order)),
+    ...(t.startDate !== undefined ? { startDate: t.startDate } : {}),
+    ...(t.deadline !== undefined ? { deadline: t.deadline } : {}),
+    ...(t.areaId ? { areaId: t.areaId } : {}),
+    ...(status !== 'open' ? { completedAt: t.completedAt ?? stamp(env) } : {}),
+  }
+  if (project.startDate !== undefined && project.startDate <= env.today) {
+    project.todayOrder = keyAfterLast(todayKeys(d, env))
+  }
+  d.put('projects', project)
+
+  const checks = d
+    .all('checklistItems')
+    .filter((c) => c.todoId === todoId)
+    .sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+  for (const c of checks) {
+    const child = createTodo(d, env, {
+      title: c.title,
+      placement: { list: 'project', projectId: project.id },
+    })
+    if (c.done) setStatus(d, env, [child.id], 'completed')
+    d.remove('checklistItems', c.id)
+  }
+  d.remove('todos', todoId)
+  return project
+}
+
+/**
+ * Turn a project into a to-do. Child to-dos become checklist items; headings
+ * are dropped. The project and its children are removed.
+ */
+export function convertProjectToTodo(d: Draft, env: Env, projectId: ID): Todo {
+  const p = d.get('projects', projectId)
+  if (!p) throw new Error('project not found')
+  const children = d
+    .all('todos')
+    .filter((t) => t.projectId === projectId && !t.trashedAt)
+    .sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+
+  const todo = createTodo(d, env, {
+    title: p.title,
+    notes: p.notes,
+    placement: p.areaId
+      ? { list: 'area', areaId: p.areaId }
+      : { list: 'ready' },
+  })
+  const status: Status = p.status === 'canceled' ? 'open' : p.status
+  const start: Todo['start'] =
+    p.startDate !== undefined
+      ? 'ready'
+      : p.start === 'later'
+        ? 'later'
+        : todo.start
+  const patched = touch(todo, env, {
+    status,
+    start,
+    tagIds: [...p.tagIds],
+    ...(p.startDate !== undefined ? { startDate: p.startDate } : {}),
+    ...(p.deadline !== undefined ? { deadline: p.deadline } : {}),
+    ...(status !== 'open' ? { completedAt: p.completedAt ?? stamp(env) } : {}),
+    ...(p.startDate !== undefined && p.startDate <= env.today
+      ? { todayOrder: keyAfterLast(todayKeys(d, env)) }
+      : {}),
+  })
+  d.put('todos', patched)
+
+  for (const c of children) {
+    const item = addChecklistItem(d, env, patched.id, c.title)
+    if (c.status === 'completed') {
+      updateChecklistItem(d, env, item.id, { done: true })
+    }
+    for (const ch of d.all('checklistItems')) {
+      if (ch.todoId === c.id) d.remove('checklistItems', ch.id)
+    }
+    d.remove('todos', c.id)
+  }
+  for (const h of d.all('headings')) {
+    if (h.projectId === projectId) d.remove('headings', h.id)
+  }
+  d.remove('projects', projectId)
+  return d.get('todos', patched.id)!
+}
+
+/**
+ * Turn a heading into a project (PLAN.md §8.2). Its to-dos move into the new
+ * project (no heading); the heading is removed. The new project shares the
+ * parent project's area.
+ */
+export function convertHeadingToProject(
+  d: Draft,
+  env: Env,
+  headingId: ID,
+): Project {
+  const h = d.get('headings', headingId)
+  if (!h) throw new Error('heading not found')
+  const parent = d.get('projects', h.projectId)
+  const siblings = d.all('projects').filter((p) => p.areaId === parent?.areaId)
+  const project: Project = {
+    type: 'project',
+    id: env.newId(),
+    createdAt: stamp(env),
+    updatedAt: stamp(env),
+    title: h.title,
+    notes: '',
+    status: 'open',
+    start: 'ready',
+    tonight: false,
+    tagIds: [],
+    order: keyAfterLast(siblings.map((p) => p.order)),
+    ...(parent?.areaId ? { areaId: parent.areaId } : {}),
+  }
+  d.put('projects', project)
+
+  const children = d
+    .all('todos')
+    .filter((t) => t.headingId === headingId && !t.trashedAt)
+    .sort((a, b) => (a.order < b.order ? -1 : a.order > b.order ? 1 : 0))
+  for (const t of children) {
+    moveTodos(d, env, [t.id], { kind: 'project', projectId: project.id })
+  }
+  d.remove('headings', headingId)
+  return project
+}
+
 export function createArea(d: Draft, env: Env, title: string): Area {
   const area: Area = {
     type: 'area',

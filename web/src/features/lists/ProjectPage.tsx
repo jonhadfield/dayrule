@@ -1,5 +1,11 @@
 import { useNavigate, useParams } from '@tanstack/react-router'
-import { Check, Ellipsis, Heading as HeadingIcon, Trash2 } from 'lucide-react'
+import {
+  Check,
+  Ellipsis,
+  Heading as HeadingIcon,
+  ListTodo,
+  Trash2,
+} from 'lucide-react'
 import { DropdownMenu } from 'radix-ui'
 import {
   useAllEntities,
@@ -7,6 +13,7 @@ import {
   useListContext,
 } from '../../app/context'
 import { formatDisplayDate } from '../../domain/dates'
+import { homeOf } from '../../domain/find'
 import { projectProgress, projectView } from '../../domain/lists'
 import * as cmd from '../../store/commands'
 import { Progress } from '../../ui/Progress'
@@ -103,6 +110,19 @@ export function ProjectPage() {
                 {project.status === 'open'
                   ? 'Complete Project'
                   : 'Reopen Project'}
+              </DropdownMenu.Item>
+              <DropdownMenu.Item
+                className={menuItem}
+                onSelect={() => {
+                  const todo = store.run('Convert to To-Do', (d, env) =>
+                    cmd.convertProjectToTodo(d, env, project.id),
+                  )
+                  void navigate({
+                    to: homeOf(store.entities, todo, ctx).path,
+                  })
+                }}
+              >
+                <ListTodo size={14} /> Convert to To-Do
               </DropdownMenu.Item>
               <DropdownMenu.Item
                 className={`${menuItem} text-deadline`}
@@ -204,6 +224,21 @@ export function ProjectPage() {
               }
             >
               Add
+            </button>
+            <button
+              type="button"
+              className="text-xs text-text-secondary hover:text-text"
+              onClick={() => {
+                const next = store.run('Convert Heading to Project', (d, env) =>
+                  cmd.convertHeadingToProject(d, env, heading.id),
+                )
+                void navigate({
+                  to: '/project/$projectId',
+                  params: { projectId: next.id },
+                })
+              }}
+            >
+              Convert
             </button>
             <button
               type="button"

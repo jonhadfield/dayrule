@@ -44,6 +44,7 @@ export DAYRULE_PASSWORD=…
 ./dayrule inbox
 ./dayrule today
 ./dayrule add "Buy milk"
+./dayrule schedule "Buy milk"
 ./dayrule complete "Buy milk"
 ```
 
@@ -85,6 +86,7 @@ tools to work.
 | `list_inbox` | Open Inbox to-dos |
 | `list_today` | Open Today to-dos |
 | `add_todo` | Create an Inbox to-do |
+| `schedule_todo` | Put on Today by id or exact title |
 | `complete_todo` | Complete by id or exact title |
 
 ## How it syncs
