@@ -30,6 +30,11 @@ interface UIState {
   pendingFocus: { todoId: string; path: string } | null
   /** Just-completed to-dos still shown: 'shown', then 'leaving' as they fold away. */
   lingering: Record<string, 'shown' | 'leaving'>
+  /**
+   * When a list windows its rows (Done), keyboard order comes from this
+   * instead of querying the DOM for `[data-todo-id]`.
+   */
+  listTodoIds: string[] | null
 
   linger: (ids: string[]) => void
   stopLingering: (ids: string[]) => void
@@ -43,6 +48,7 @@ interface UIState {
     orderField: OrderField
     projectId?: string | null
   }) => void
+  setListTodoIds: (ids: string[] | null) => void
   openPanel: (panel: PanelKind | null, ids?: string[]) => void
   startSelecting: (id: string) => void
   stopSelecting: () => void
@@ -70,6 +76,7 @@ export const useUI = create<UIState>((set) => ({
   finding: null,
   pendingFocus: null,
   lingering: {},
+  listTodoIds: null,
 
   linger: (ids) => {
     if (!ids.length) return
@@ -128,6 +135,7 @@ export const useUI = create<UIState>((set) => ({
     })),
   setListContext: ({ placement, orderField, projectId = null }) =>
     set({ placement, orderField, projectId }),
+  setListTodoIds: (listTodoIds) => set({ listTodoIds }),
   openPanel: (panel, ids) =>
     set({ panel, panelIds: panel ? (ids ?? null) : null }),
   startSelecting: (id) =>
@@ -140,6 +148,8 @@ export const useUI = create<UIState>((set) => ({
 
 /** To-do ids in the order they're displayed in the main list. */
 export function visibleTodoIds(): string[] {
+  const override = useUI.getState().listTodoIds
+  if (override) return override
   return Array.from(document.querySelectorAll<HTMLElement>('[data-todo-id]'))
     .map((el) => el.dataset.todoId ?? '')
     .filter((id, i, all) => id !== '' && all.indexOf(id) === i)
