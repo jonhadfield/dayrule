@@ -1,0 +1,3 @@
+# Local Things → Dayrule export (plaintext titles/notes). Never commit.
+things.json
+*.things-export.json

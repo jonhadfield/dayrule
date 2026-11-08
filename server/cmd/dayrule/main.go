@@ -9,6 +9,7 @@
 //	go run ./cmd/dayrule add "Buy milk"
 //	go run ./cmd/dayrule complete "Buy milk"
 //	go run ./cmd/dayrule schedule "Buy milk"
+//	go run ./cmd/dayrule cancel "Buy milk"
 //	go run ./cmd/dayrule mcp
 package main
 
@@ -87,6 +88,13 @@ func main() {
 			fatal(err)
 		}
 		fmt.Printf("Scheduled for Today: %s (%s)\n", t.Title, t.ID)
+	case "cancel":
+		q := strings.TrimSpace(strings.Join(args, " "))
+		t, err := s.Cancel(ctx, q)
+		if err != nil {
+			fatal(err)
+		}
+		fmt.Printf("Canceled: %s (%s)\n", t.Title, t.ID)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n", cmd)
 		usage()
@@ -122,6 +130,7 @@ Usage:
   dayrule add <title>
   dayrule complete <id-or-title>
   dayrule schedule <id-or-title>
+  dayrule cancel <id-or-title>
   dayrule mcp
 
 Environment:
