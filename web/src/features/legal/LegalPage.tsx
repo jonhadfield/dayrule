@@ -1,9 +1,16 @@
-import type { ReactNode } from 'react'
+import { useEffect, type ReactNode } from 'react'
+import { setDocumentTitle } from '../../app/documentTitle'
 import { Privacy } from './Privacy'
 import { Terms } from './Terms'
 
 /** The privacy notice and terms: public, no account needed (PLAN.md §17, decision 2). */
 export function LegalPage({ path }: { path: string }) {
+  useEffect(() => {
+    setDocumentTitle(
+      path === '/terms' ? 'Terms · Dayrule' : 'Privacy · Dayrule',
+    )
+  }, [path])
+
   return (
     <main className="mx-auto max-w-[680px] px-5 pt-[max(env(safe-area-inset-top),24px)] pb-16 leading-relaxed">
       <a href="/" className="text-accent hover:underline">

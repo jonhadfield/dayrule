@@ -1,0 +1,20 @@
+# Public marketing / help / legal only. App list routes are gated SPA shells.
+User-agent: *
+Allow: /$
+Allow: /help
+Allow: /help/
+Allow: /privacy
+Allow: /terms
+Disallow: /inbox
+Disallow: /today
+Disallow: /scheduled
+Disallow: /backlog
+Disallow: /ready
+Disallow: /later
+Disallow: /done
+Disallow: /trash
+Disallow: /project/
+Disallow: /area/
+Disallow: /api/
+
+Sitemap: https://dayrule.app/sitemap.xml
