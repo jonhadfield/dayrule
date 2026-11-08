@@ -1,5 +1,5 @@
 @import 'tailwindcss';
-@import '@fontsource-variable/fraunces';
+@import './styles/fraunces-latin.css';
 @import './styles/tokens.css';
 
 @theme inline {

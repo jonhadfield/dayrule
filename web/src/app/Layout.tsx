@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useRouterState } from '@tanstack/react-router'
 import { useEffect } from 'react'
 import { closeEditor, startNewTodo } from '../features/todo/editing'
+import { fieldsFromShareParams, startSharedTodo } from '../features/todo/share'
 import { useEntityStore, useIsDesktop, useToday } from './context'
 import { useRepeats } from './useRepeats'
 import { useUI, visibleTodoIds } from './ui-state'
@@ -23,6 +24,7 @@ export function Layout() {
   const isDesktop = useIsDesktop()
   const store = useEntityStore()
   const pathname = useRouterState({ select: (s) => s.location.pathname })
+  const search = useRouterState({ select: (s) => s.location.search })
   const navigate = useNavigate()
   useRepeats(store, useToday())
   useEdgeSwipeBack(!isDesktop && pathname !== '/')
@@ -99,12 +101,19 @@ export function Layout() {
     )
   }, [pendingFocus, pathname, isDesktop])
 
-  // The installed app's "New to-do" shortcut opens /inbox?add=1.
+  // PWA "New to-do" shortcut: /inbox?add=1. Android share target: title/text/url.
   useEffect(() => {
-    if (new URLSearchParams(location.search).get('add') !== '1') return
+    const q = new URLSearchParams(window.location.search)
+    if (q.get('add') === '1') {
+      void navigate({ to: '/inbox', replace: true })
+      startNewTodo(store, { list: 'inbox' })
+      return
+    }
+    const shared = fieldsFromShareParams(q)
+    if (!shared) return
     void navigate({ to: '/inbox', replace: true })
-    startNewTodo(store, { list: 'inbox' })
-  }, [navigate, store])
+    startSharedTodo(store, shared)
+  }, [navigate, pathname, search, store])
 
   if (!isDesktop) {
     return (

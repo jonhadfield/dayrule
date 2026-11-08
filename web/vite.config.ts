@@ -165,6 +165,17 @@ export default defineConfig({
             icons: [{ src: `/icons/icon${icon}-192.png`, sizes: '192x192' }],
           },
         ],
+        // Android: share text/URL into Inbox (PLAN.md §8.3 / §8.4).
+        share_target: {
+          action: '/inbox',
+          method: 'GET',
+          enctype: 'application/x-www-form-urlencoded',
+          params: {
+            title: 'title',
+            text: 'text',
+            url: 'url',
+          },
+        },
       },
     }),
   ],
