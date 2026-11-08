@@ -5,7 +5,7 @@ import {
   useEntityStore,
   useListContext,
 } from '../../app/context'
-import { formatDisplayDate, fromLocalDate } from '../../domain/dates'
+import { fromLocalDate } from '../../domain/dates'
 import * as lists from '../../domain/lists'
 import { filterByTag } from '../../domain/lists'
 import * as cmd from '../../store/commands'
@@ -13,6 +13,7 @@ import { listMeta, NOT_NOW, type ListKey } from '../../ui/lists'
 import { ItemList } from '../todo/ItemList'
 import type { Group } from '../dnd/types'
 import { ListShell, SectionHeading, TagFilterBar } from './ListShell'
+import { VirtualDoneList } from './VirtualDoneList'
 
 function header(list: ListKey) {
   const meta = listMeta(list)
@@ -269,14 +270,7 @@ export function DonePage() {
         ) : null
       }
     >
-      {days.map((day) => (
-        <section key={day.date}>
-          <SectionHeading color="text-text-secondary">
-            {formatDisplayDate(day.date)}
-          </SectionHeading>
-          <ItemList items={day.items} ctx={ctx} />
-        </section>
-      ))}
+      <VirtualDoneList days={days} ctx={ctx} />
     </ListShell>
   )
 }
