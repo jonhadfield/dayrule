@@ -17,6 +17,9 @@ go run . -o things.json
 go run . -db "/path/to/main.sqlite" -o things.json
 ```
 
+`things.json` is gitignored — it holds plaintext to-do titles and notes.
+Keep it outside the repo or delete it after importing.
+
 Default discovery looks under:
 
 `~/Library/Group Containers/JLMPQHK86H.com.culturedcode.ThingsMac/ThingsData-*/Things Database.thingsdatabase/main.sqlite`

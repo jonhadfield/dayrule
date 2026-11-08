@@ -46,6 +46,7 @@ export DAYRULE_PASSWORD=…
 ./dayrule add "Buy milk"
 ./dayrule schedule "Buy milk"
 ./dayrule complete "Buy milk"
+./dayrule cancel "Buy milk"
 ```
 
 ## Cursor MCP
@@ -88,6 +89,7 @@ tools to work.
 | `add_todo` | Create an Inbox to-do |
 | `schedule_todo` | Put on Today by id or exact title |
 | `complete_todo` | Complete by id or exact title |
+| `cancel_todo` | Cancel by id or exact title |
 
 ## How it syncs
 

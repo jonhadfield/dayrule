@@ -82,6 +82,21 @@ func runMCP(ctx context.Context) error {
 		return nil, addOut{ID: t.ID, Title: t.Title, List: "Today"}, nil
 	})
 
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "cancel_todo",
+		Description: "Cancel an open Dayrule to-do by id or exact title (status=canceled)",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in completeIn) (*mcp.CallToolResult, addOut, error) {
+		q := todoQuery(in.ID, in.Title)
+		if q == "" {
+			return nil, addOut{}, fmt.Errorf("id or title is required")
+		}
+		t, err := s.Cancel(ctx, q)
+		if err != nil {
+			return nil, addOut{}, err
+		}
+		return nil, addOut{ID: t.ID, Title: t.Title, List: "Canceled"}, nil
+	})
+
 	return server.Run(ctx, &mcp.StdioTransport{})
 }
 
