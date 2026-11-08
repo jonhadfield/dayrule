@@ -42,6 +42,28 @@ func runMCP(ctx context.Context) error {
 	})
 
 	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_backlog",
+		Description: "List open Dayrule Backlog to-dos (anytime and Not now)",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listOut, error) {
+		v, err := s.PullVault(ctx)
+		if err != nil {
+			return nil, listOut{}, err
+		}
+		return nil, toListOut(v.Backlog(time.Now().Format("2006-01-02"))), nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "list_scheduled",
+		Description: "List open Dayrule Scheduled to-dos (When date after today)",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, _ struct{}) (*mcp.CallToolResult, listOut, error) {
+		v, err := s.PullVault(ctx)
+		if err != nil {
+			return nil, listOut{}, err
+		}
+		return nil, toListOut(v.Scheduled(time.Now().Format("2006-01-02"))), nil
+	})
+
+	mcp.AddTool(server, &mcp.Tool{
 		Name:        "add_todo",
 		Description: "Create an open to-do in the Dayrule Inbox",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in addIn) (*mcp.CallToolResult, addOut, error) {

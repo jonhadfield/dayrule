@@ -137,6 +137,48 @@ func (v *Vault) Today(today string) []*Todo {
 	return out
 }
 
+// Backlog returns open anytime to-dos (start=ready, startDate empty or ≤ today)
+// plus Not now (start=later). Matches PLAN §4.1 without area/project grouping.
+func (v *Vault) Backlog(today string) []*Todo {
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	var out []*Todo
+	for _, t := range v.Todos {
+		if t.Status != "open" {
+			continue
+		}
+		switch t.Start {
+		case "later":
+			out = append(out, t)
+		case "ready":
+			if t.StartDate == "" || t.StartDate <= today {
+				out = append(out, t)
+			}
+		}
+	}
+	sortTodos(out)
+	return out
+}
+
+// Scheduled returns open to-dos with a When date after today (excluding Not now).
+func (v *Vault) Scheduled(today string) []*Todo {
+	if today == "" {
+		today = time.Now().Format("2006-01-02")
+	}
+	var out []*Todo
+	for _, t := range v.Todos {
+		if t.Status != "open" || t.Start == "later" {
+			continue
+		}
+		if t.StartDate != "" && t.StartDate > today {
+			out = append(out, t)
+		}
+	}
+	sortTodos(out)
+	return out
+}
+
 func sortTodos(ts []*Todo) {
 	for i := 0; i < len(ts); i++ {
 		for j := i + 1; j < len(ts); j++ {
