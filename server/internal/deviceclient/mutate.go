@@ -80,6 +80,22 @@ func (s *Session) ScheduleToday(ctx context.Context, idOrTitle string) (*Todo, e
 	})
 }
 
+// Cancel marks a to-do canceled (status=canceled), matching the web app.
+func (s *Session) Cancel(ctx context.Context, idOrTitle string) (*Todo, error) {
+	return s.patchOpenTodo(ctx, idOrTitle, func(val map[string]any, now time.Time, tick string) {
+		iso := now.Format("2006-01-02T15:04:05.000Z")
+		val["status"] = "canceled"
+		val["completedAt"] = iso
+		val["updatedAt"] = iso
+		clock := ensureClock(val)
+		clock["status"] = tick
+		clock["completedAt"] = tick
+		clock["updatedAt"] = tick
+	}, func(t *Todo) {
+		t.Status = "canceled"
+	})
+}
+
 func (s *Session) patchOpenTodo(
 	ctx context.Context,
 	idOrTitle string,
