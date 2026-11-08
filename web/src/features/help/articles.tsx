@@ -781,9 +781,31 @@ function Data() {
       <P>
         Account → Your data. <strong>Export JSON</strong> saves everything in a
         file you can import again; <strong>Export Markdown</strong> saves a
-        readable outline. Exports aren’t encrypted, so keep them safe.
+        readable outline. Both are built in your browser — not on Dayrule’s
+        servers — and the files aren’t encrypted, so keep them safe.
         <strong> Import JSON</strong> adds a copy of a Dayrule export and never
         replaces what’s there.
+      </P>
+      <H2>Import from Things 3</H2>
+      <P>
+        On a Mac that has Things 3, run the read-only exporter from the Dayrule
+        repo:
+      </P>
+      <List>
+        <li>
+          <K>cd tools/things-export && go run . -o things.json</K> (or pass{' '}
+          <K>-db</K> to the Things <K>main.sqlite</K> path).
+        </li>
+        <li>
+          In Dayrule, Account → Your data → Import JSON… and choose that file.
+        </li>
+      </List>
+      <P>
+        Mapping happens in the browser; the server never sees the plaintext.
+        Areas, projects, headings, to-dos, checklists, tags, When/Deadline and
+        the Logbook (as Done) come across. Things day / week / month / year
+        repeats (including weekly days and after-completion) map into Dayrule;
+        unusual schedules may still need a quick edit.
       </P>
       <H2>Delete your account</H2>
       <P>

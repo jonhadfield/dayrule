@@ -34,45 +34,58 @@ func (s *Session) AddInbox(ctx context.Context, title string) (*Todo, error) {
 		"clock": clock,
 	}
 	key := "todos/" + id
-	wireID := syncID(s.syncIDKey, key)
-	nonce, ct, err := s.sealPayload(wireID, map[string]any{"k": key, "v": val})
+	seq, err := s.pushNew(ctx, key, val)
 	if err != nil {
 		return nil, err
 	}
-	var pushResp struct {
-		Results []struct {
-			ID       string `json:"id"`
-			Seq      int64  `json:"seq"`
-			Conflict bool   `json:"conflict"`
-			Error    string `json:"error"`
-		} `json:"results"`
-	}
-	if err := s.postJSON(ctx, "/api/v1/sync/push", map[string]any{
-		"records": []map[string]any{{
-			"id": wireID, "baseSeq": 0, "alg": alg, "keyId": keyID,
-			"nonce": nonce, "ciphertext": ct,
-		}},
-	}, &pushResp); err != nil {
-		return nil, fmt.Errorf("push: %w", err)
-	}
-	if len(pushResp.Results) == 0 {
-		return nil, fmt.Errorf("empty push response")
-	}
-	r := pushResp.Results[0]
-	if r.Error != "" {
-		return nil, fmt.Errorf("push: %s", r.Error)
-	}
-	if r.Conflict {
-		return nil, fmt.Errorf("push conflict on new to-do (retry)")
-	}
 	return &Todo{
 		ID: id, Title: title, Status: "open", Start: "inbox", Order: "a0",
-		Seq: r.Seq, EntityKey: key,
+		Seq: seq, EntityKey: key,
 	}, nil
 }
 
-// Complete marks a to-do done: pull, patch status, push with baseSeq.
+// Complete marks a to-do completed: pull, patch status, push with baseSeq.
 func (s *Session) Complete(ctx context.Context, idOrTitle string) (*Todo, error) {
+	return s.patchOpenTodo(ctx, idOrTitle, func(val map[string]any, now time.Time, tick string) {
+		iso := now.Format("2006-01-02T15:04:05.000Z")
+		val["status"] = "completed"
+		val["completedAt"] = iso
+		val["updatedAt"] = iso
+		clock := ensureClock(val)
+		clock["status"] = tick
+		clock["completedAt"] = tick
+		clock["updatedAt"] = tick
+	}, func(t *Todo) {
+		t.Status = "completed"
+	})
+}
+
+// ScheduleToday puts an open to-do on Today (start=ready, startDate=today).
+func (s *Session) ScheduleToday(ctx context.Context, idOrTitle string) (*Todo, error) {
+	today := time.Now().Format("2006-01-02")
+	return s.patchOpenTodo(ctx, idOrTitle, func(val map[string]any, now time.Time, tick string) {
+		iso := now.Format("2006-01-02T15:04:05.000Z")
+		val["start"] = "ready"
+		val["startDate"] = today
+		val["tonight"] = false
+		val["updatedAt"] = iso
+		clock := ensureClock(val)
+		clock["start"] = tick
+		clock["startDate"] = tick
+		clock["tonight"] = tick
+		clock["updatedAt"] = tick
+	}, func(t *Todo) {
+		t.Start = "ready"
+		t.StartDate = today
+	})
+}
+
+func (s *Session) patchOpenTodo(
+	ctx context.Context,
+	idOrTitle string,
+	apply func(val map[string]any, now time.Time, tick string),
+	after func(t *Todo),
+) (*Todo, error) {
 	v, err := s.PullVault(ctx)
 	if err != nil {
 		return nil, err
@@ -86,22 +99,31 @@ func (s *Session) Complete(ctx context.Context, idOrTitle string) (*Todo, error)
 		return nil, err
 	}
 	now := time.Now().UTC()
-	iso := now.Format("2006-01-02T15:04:05.000Z")
 	tick := hlcTick(now, 0, hlcDevice)
-	val["status"] = "done"
-	val["updatedAt"] = iso
-	clock, _ := val["clock"].(map[string]any)
-	if clock == nil {
-		clock = map[string]any{}
-		val["clock"] = clock
-	}
-	clock["status"] = tick
-	clock["updatedAt"] = tick
+	apply(val, now, tick)
 
-	wireID := syncID(s.syncIDKey, t.EntityKey)
-	nonce, ct, err := s.sealPayload(wireID, map[string]any{"k": t.EntityKey, "v": val})
+	seq, err := s.pushExisting(ctx, t.EntityKey, t.Seq, val)
 	if err != nil {
 		return nil, err
+	}
+	t.Seq = seq
+	after(t)
+	return t, nil
+}
+
+func (s *Session) pushNew(ctx context.Context, key string, val map[string]any) (int64, error) {
+	return s.push(ctx, key, 0, val)
+}
+
+func (s *Session) pushExisting(ctx context.Context, key string, baseSeq int64, val map[string]any) (int64, error) {
+	return s.push(ctx, key, baseSeq, val)
+}
+
+func (s *Session) push(ctx context.Context, key string, baseSeq int64, val map[string]any) (int64, error) {
+	wireID := syncID(s.syncIDKey, key)
+	nonce, ct, err := s.sealPayload(wireID, map[string]any{"k": key, "v": val})
+	if err != nil {
+		return 0, err
 	}
 	var pushResp struct {
 		Results []struct {
@@ -113,25 +135,35 @@ func (s *Session) Complete(ctx context.Context, idOrTitle string) (*Todo, error)
 	}
 	if err := s.postJSON(ctx, "/api/v1/sync/push", map[string]any{
 		"records": []map[string]any{{
-			"id": wireID, "baseSeq": t.Seq, "alg": alg, "keyId": keyID,
+			"id": wireID, "baseSeq": baseSeq, "alg": alg, "keyId": keyID,
 			"nonce": nonce, "ciphertext": ct,
 		}},
 	}, &pushResp); err != nil {
-		return nil, fmt.Errorf("push: %w", err)
+		return 0, fmt.Errorf("push: %w", err)
 	}
 	if len(pushResp.Results) == 0 {
-		return nil, fmt.Errorf("empty push response")
+		return 0, fmt.Errorf("empty push response")
 	}
 	r := pushResp.Results[0]
 	if r.Error != "" {
-		return nil, fmt.Errorf("push: %s", r.Error)
+		return 0, fmt.Errorf("push: %s", r.Error)
 	}
 	if r.Conflict {
-		return nil, fmt.Errorf("conflict — pull again and retry")
+		if baseSeq == 0 {
+			return 0, fmt.Errorf("push conflict on new to-do (retry)")
+		}
+		return 0, fmt.Errorf("conflict — pull again and retry")
 	}
-	t.Status = "done"
-	t.Seq = r.Seq
-	return t, nil
+	return r.Seq, nil
+}
+
+func ensureClock(val map[string]any) map[string]any {
+	clock, _ := val["clock"].(map[string]any)
+	if clock == nil {
+		clock = map[string]any{}
+		val["clock"] = clock
+	}
+	return clock
 }
 
 func findTodo(v *Vault, idOrTitle string) *Todo {

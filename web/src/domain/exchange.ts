@@ -5,13 +5,20 @@
 // Import validates every record and copies it in with new ids, so it never
 // overwrites or brings back anything already in the account.
 
+import { toLocalDate } from './dates'
 import { compareKeys } from './order'
+import {
+  looksLikeThingsExport,
+  mapThingsToExport,
+  parseThingsExport,
+} from './things'
 import type {
   Area,
   ChecklistItem,
   Entities,
   Heading,
   ID,
+  LocalDate,
   Project,
   Repeat,
   Tag,
@@ -261,8 +268,24 @@ function repeat(r: Raw, where: string): Repeat | undefined {
   })
 }
 
-/** Parse and validate an export file. Throws ImportError with a reason. */
-export function parseImport(text: string): ExportData {
+/** Parse and validate an export file. Throws ImportError with a reason.
+ *  Accepts dayrule-export and dayrule-things-export (PLAN §8.3).
+ *  `today` is only used for Things imports (past When dates are dropped). */
+export function parseImport(
+  text: string,
+  today: LocalDate = toLocalDate(new Date()),
+): ExportData {
+  if (looksLikeThingsExport(text)) {
+    try {
+      return mapThingsToExport(parseThingsExport(text), today)
+    } catch (err) {
+      throw new ImportError(
+        err instanceof Error
+          ? err.message
+          : 'That Things file couldn’t be read.',
+      )
+    }
+  }
   let raw: unknown
   try {
     raw = JSON.parse(text)
@@ -270,7 +293,9 @@ export function parseImport(text: string): ExportData {
     throw new ImportError('This file isn’t valid JSON.')
   }
   if (!isObj(raw) || raw.format !== EXPORT_FORMAT) {
-    throw new ImportError('This isn’t a Dayrule export.')
+    throw new ImportError(
+      'This isn’t a Dayrule export (or a Things export from things-export).',
+    )
   }
   if (raw.version !== EXPORT_VERSION) {
     throw new ImportError(

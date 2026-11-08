@@ -56,10 +56,7 @@ func runMCP(ctx context.Context) error {
 		Name:        "complete_todo",
 		Description: "Mark an open Dayrule to-do complete by id or exact title",
 	}, func(ctx context.Context, _ *mcp.CallToolRequest, in completeIn) (*mcp.CallToolResult, addOut, error) {
-		q := strings.TrimSpace(in.ID)
-		if q == "" {
-			q = strings.TrimSpace(in.Title)
-		}
+		q := todoQuery(in.ID, in.Title)
 		if q == "" {
 			return nil, addOut{}, fmt.Errorf("id or title is required")
 		}
@@ -70,7 +67,30 @@ func runMCP(ctx context.Context) error {
 		return nil, addOut{ID: t.ID, Title: t.Title, List: "Done"}, nil
 	})
 
+	mcp.AddTool(server, &mcp.Tool{
+		Name:        "schedule_todo",
+		Description: "Schedule an open Dayrule to-do onto Today by id or exact title",
+	}, func(ctx context.Context, _ *mcp.CallToolRequest, in completeIn) (*mcp.CallToolResult, addOut, error) {
+		q := todoQuery(in.ID, in.Title)
+		if q == "" {
+			return nil, addOut{}, fmt.Errorf("id or title is required")
+		}
+		t, err := s.ScheduleToday(ctx, q)
+		if err != nil {
+			return nil, addOut{}, err
+		}
+		return nil, addOut{ID: t.ID, Title: t.Title, List: "Today"}, nil
+	})
+
 	return server.Run(ctx, &mcp.StdioTransport{})
+}
+
+func todoQuery(id, title string) string {
+	q := strings.TrimSpace(id)
+	if q == "" {
+		q = strings.TrimSpace(title)
+	}
+	return q
 }
 
 type listOut struct {
