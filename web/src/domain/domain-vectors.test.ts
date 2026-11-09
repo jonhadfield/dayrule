@@ -19,6 +19,15 @@ import {
 } from './repeat'
 import type { Repeat } from './types'
 import { instanceId } from '../store/repeats'
+import { World } from './fixtures'
+import {
+  inbox,
+  notNow,
+  scheduled,
+  sidebarCounts,
+  today as todayList,
+  type ListContext,
+} from './lists'
 
 type MergeE = Clocked & {
   id: string
@@ -195,9 +204,140 @@ function build() {
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
     },
+    // PLAN §16.1: list-selector snapshots (fixed ids). Rebuild the same
+    // World on native and assert selector outputs. Find / merge-trace /
+    // generated-instance fixtures still to expand later.
+    lists: (() => {
+      const w = new World()
+      const area = w.area({ id: 'area-home', title: 'Home' })
+      const loose = w.project({ id: 'proj-loose', title: 'Loose' })
+      const nested = w.project({
+        id: 'proj-kitchen',
+        title: 'Kitchen',
+        areaId: area.id,
+      })
+      const laterProj = w.project({
+        id: 'proj-later',
+        title: 'Someday',
+        start: 'later',
+      })
+      const inboxA = w.todo({ id: 'todo-inbox-a', title: 'Milk' })
+      const inboxB = w.todo({ id: 'todo-inbox-b', title: 'Eggs' })
+      w.todo({
+        id: 'todo-ready-undated',
+        title: 'Anytime',
+        start: 'ready',
+      })
+      const todayStarted = w.todo({
+        id: 'todo-today',
+        title: 'Today chore',
+        start: 'ready',
+        startDate: today,
+        todayOrder: 'a1',
+      })
+      const overdue = w.todo({
+        id: 'todo-overdue',
+        title: 'Overdue',
+        start: 'ready',
+        deadline: '2026-09-30',
+        todayOrder: 'a0',
+      })
+      w.todo({
+        id: 'todo-tomorrow',
+        title: 'Tomorrow',
+        start: 'ready',
+        startDate: '2026-10-05',
+      })
+      w.todo({
+        id: 'todo-nov',
+        title: 'November',
+        start: 'ready',
+        startDate: '2026-11-15',
+      })
+      w.todo({
+        id: 'todo-in-project',
+        title: 'Paint',
+        start: 'ready',
+        projectId: nested.id,
+      })
+      w.todo({
+        id: 'todo-later',
+        title: 'Not now todo',
+        start: 'later',
+      })
+      w.todo({
+        id: 'todo-in-later-proj',
+        title: 'Hidden by later project',
+        start: 'ready',
+        startDate: today,
+        projectId: laterProj.id,
+      })
+      const ctx: ListContext = { today }
+      const sched = scheduled(w.e, ctx)
+      const later = notNow(w.e, ctx)
+      return {
+        today,
+        seed: {
+          areas: Object.values(w.e.areas).map((a) => ({
+            id: a.id,
+            title: a.title,
+            order: a.order,
+          })),
+          projects: Object.values(w.e.projects).map((p) => ({
+            id: p.id,
+            title: p.title,
+            areaId: p.areaId ?? null,
+            start: p.start,
+            startDate: p.startDate ?? null,
+            order: p.order,
+          })),
+          todos: Object.values(w.e.todos).map((t) => ({
+            id: t.id,
+            title: t.title,
+            start: t.start,
+            startDate: t.startDate ?? null,
+            deadline: t.deadline ?? null,
+            tonight: t.tonight,
+            status: t.status,
+            projectId: t.projectId ?? null,
+            areaId: t.areaId ?? null,
+            order: t.order,
+            todayOrder: t.todayOrder ?? null,
+            trashedAt: t.trashedAt ?? null,
+          })),
+        },
+        expect: {
+          inbox: inbox(w.e, ctx).map((t) => t.id),
+          today: todayList(w.e, ctx).map((i) => i.id),
+          scheduled: {
+            days: sched.days.map((d) => ({
+              date: d.date,
+              ids: d.items.map((i) => i.id),
+            })),
+            months: sched.months.map((m) => ({
+              month: m.month,
+              ids: m.items.map((i) => i.id),
+            })),
+            waiting: sched.waiting.map((i) => i.id),
+          },
+          notNow: {
+            projects: later.projects.map((p) => p.id),
+            todos: later.todos.map((t) => t.id),
+          },
+          sidebarCounts: sidebarCounts(w.e, ctx),
+        },
+        // Sanity anchors so a bad World rewrite is obvious in review.
+        anchors: {
+          inboxA: inboxA.id,
+          inboxB: inboxB.id,
+          todayStarted: todayStarted.id,
+          overdue: overdue.id,
+          loose: loose.id,
+        },
+      }
+    })(),
     // PLAN §16.1: repeat sequences + instanceId (31st clamp, 29 Feb, DST,
-    // weekly sets, after-completion). Expand further when list-selector /
-    // merge-trace fixtures land.
+    // weekly sets, after-completion).
     repeats: {
       instanceId: [
         {
