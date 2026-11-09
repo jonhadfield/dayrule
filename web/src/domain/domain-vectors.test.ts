@@ -23,8 +23,10 @@ import { createEntityStore, type Clock } from '../store/store'
 import { World } from './fixtures'
 import { buildFinder, homeOf } from './find'
 import {
+  effectiveTagIds,
   inbox,
   notNow,
+  projectView,
   scheduled,
   sidebarCounts,
   today as todayList,
@@ -206,9 +208,133 @@ function build() {
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
     },
+    // PLAN §16.1: project headings + inherited tags (fixed ids).
+    organisation: (() => {
+      const w = new World()
+      const areaTag = w.tag({ id: 'tag-area', title: 'Home' })
+      const projectTag = w.tag({ id: 'tag-project', title: 'Build' })
+      const todoTag = w.tag({ id: 'tag-todo', title: 'Errand' })
+      const area = w.area({
+        id: 'area-org',
+        title: 'House',
+        tagIds: [areaTag.id],
+      })
+      const project = w.project({
+        id: 'proj-org',
+        title: 'Kitchen',
+        areaId: area.id,
+        tagIds: [projectTag.id],
+      })
+      const heading = w.heading({
+        id: 'head-prep',
+        title: 'Prep',
+        projectId: project.id,
+        order: 'a0',
+      })
+      const archived = w.heading({
+        id: 'head-old',
+        title: 'Old',
+        projectId: project.id,
+        archived: true,
+        order: 'a1',
+      })
+      const underHeading = w.todo({
+        id: 'todo-under-heading',
+        title: 'Buy tiles',
+        projectId: project.id,
+        headingId: heading.id,
+        start: 'ready',
+        tagIds: [todoTag.id],
+      })
+      const looseInProject = w.todo({
+        id: 'todo-project-loose',
+        title: 'Measure bench',
+        projectId: project.id,
+        start: 'ready',
+        tagIds: [],
+      })
+      // Points at archived heading — projectView keeps it in loose todos.
+      w.todo({
+        id: 'todo-archived-heading',
+        title: 'Legacy note',
+        projectId: project.id,
+        headingId: archived.id,
+        start: 'ready',
+      })
+      const inboxOnly = w.todo({
+        id: 'todo-inbox-tags',
+        title: 'Post letter',
+        start: 'inbox',
+        tagIds: [todoTag.id],
+      })
+      const ctx: ListContext = { today }
+      const view = projectView(w.e, project.id, ctx)!
+      const sortedIds = (ids: Iterable<string>) => [...ids].sort()
+      return {
+        today,
+        seed: {
+          tags: Object.values(w.e.tags).map((t) => ({
+            id: t.id,
+            title: t.title,
+          })),
+          areas: Object.values(w.e.areas).map((a) => ({
+            id: a.id,
+            title: a.title,
+            tagIds: a.tagIds,
+            order: a.order,
+          })),
+          projects: Object.values(w.e.projects).map((p) => ({
+            id: p.id,
+            title: p.title,
+            areaId: p.areaId ?? null,
+            tagIds: p.tagIds,
+            order: p.order,
+          })),
+          headings: Object.values(w.e.headings).map((h) => ({
+            id: h.id,
+            title: h.title,
+            projectId: h.projectId,
+            archived: h.archived,
+            order: h.order,
+          })),
+          todos: Object.values(w.e.todos).map((t) => ({
+            id: t.id,
+            title: t.title,
+            projectId: t.projectId ?? null,
+            headingId: t.headingId ?? null,
+            areaId: t.areaId ?? null,
+            start: t.start,
+            tagIds: t.tagIds,
+            order: t.order,
+          })),
+        },
+        projectView: {
+          projectId: project.id,
+          looseTodoIds: view.todos.map((t) => t.id),
+          headings: view.headings.map((g) => ({
+            headingId: g.heading.id,
+            todoIds: g.todos.map((t) => t.id),
+          })),
+        },
+        effectiveTagIds: [
+          {
+            todoId: underHeading.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, underHeading)),
+          },
+          {
+            todoId: looseInProject.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, looseInProject)),
+          },
+          {
+            todoId: inboxOnly.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, inboxOnly)),
+          },
+        ],
+      }
+    })(),
     // PLAN §16.1: Quick Find known answers (fixed ids). Native rebuilds the
-    // same seed and asserts search / homeOf. Merge-trace and full
-    // generated-instance fixtures still to expand later.
+    // same seed and asserts search / homeOf. Merge-trace fixtures still to
+    // expand later.
     find: (() => {
       const w = new World()
       const project = w.project({ id: 'proj-garden', title: 'Garden shed' })
