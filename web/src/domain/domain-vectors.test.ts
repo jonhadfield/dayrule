@@ -17,12 +17,16 @@ import {
   occurrenceAfter,
   occurrenceOnOrAfter,
 } from './repeat'
-import type { Repeat } from './types'
-import { instanceId } from '../store/repeats'
+import { emptyEntities, type Repeat, type Todo } from './types'
+import { generateRepeats, instanceId } from '../store/repeats'
+import { createEntityStore, type Clock } from '../store/store'
 import { World } from './fixtures'
+import { buildFinder, homeOf } from './find'
 import {
+  effectiveTagIds,
   inbox,
   notNow,
+  projectView,
   scheduled,
   sidebarCounts,
   today as todayList,
@@ -204,9 +208,253 @@ function build() {
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
     },
+    // PLAN §16.1: project headings + inherited tags (fixed ids).
+    organisation: (() => {
+      const w = new World()
+      const areaTag = w.tag({ id: 'tag-area', title: 'Home' })
+      const projectTag = w.tag({ id: 'tag-project', title: 'Build' })
+      const todoTag = w.tag({ id: 'tag-todo', title: 'Errand' })
+      const area = w.area({
+        id: 'area-org',
+        title: 'House',
+        tagIds: [areaTag.id],
+      })
+      const project = w.project({
+        id: 'proj-org',
+        title: 'Kitchen',
+        areaId: area.id,
+        tagIds: [projectTag.id],
+      })
+      const heading = w.heading({
+        id: 'head-prep',
+        title: 'Prep',
+        projectId: project.id,
+        order: 'a0',
+      })
+      const archived = w.heading({
+        id: 'head-old',
+        title: 'Old',
+        projectId: project.id,
+        archived: true,
+        order: 'a1',
+      })
+      const underHeading = w.todo({
+        id: 'todo-under-heading',
+        title: 'Buy tiles',
+        projectId: project.id,
+        headingId: heading.id,
+        start: 'ready',
+        tagIds: [todoTag.id],
+      })
+      const looseInProject = w.todo({
+        id: 'todo-project-loose',
+        title: 'Measure bench',
+        projectId: project.id,
+        start: 'ready',
+        tagIds: [],
+      })
+      // Points at archived heading — projectView keeps it in loose todos.
+      w.todo({
+        id: 'todo-archived-heading',
+        title: 'Legacy note',
+        projectId: project.id,
+        headingId: archived.id,
+        start: 'ready',
+      })
+      const inboxOnly = w.todo({
+        id: 'todo-inbox-tags',
+        title: 'Post letter',
+        start: 'inbox',
+        tagIds: [todoTag.id],
+      })
+      const ctx: ListContext = { today }
+      const view = projectView(w.e, project.id, ctx)!
+      const sortedIds = (ids: Iterable<string>) => [...ids].sort()
+      return {
+        today,
+        seed: {
+          tags: Object.values(w.e.tags).map((t) => ({
+            id: t.id,
+            title: t.title,
+          })),
+          areas: Object.values(w.e.areas).map((a) => ({
+            id: a.id,
+            title: a.title,
+            tagIds: a.tagIds,
+            order: a.order,
+          })),
+          projects: Object.values(w.e.projects).map((p) => ({
+            id: p.id,
+            title: p.title,
+            areaId: p.areaId ?? null,
+            tagIds: p.tagIds,
+            order: p.order,
+          })),
+          headings: Object.values(w.e.headings).map((h) => ({
+            id: h.id,
+            title: h.title,
+            projectId: h.projectId,
+            archived: h.archived,
+            order: h.order,
+          })),
+          todos: Object.values(w.e.todos).map((t) => ({
+            id: t.id,
+            title: t.title,
+            projectId: t.projectId ?? null,
+            headingId: t.headingId ?? null,
+            areaId: t.areaId ?? null,
+            start: t.start,
+            tagIds: t.tagIds,
+            order: t.order,
+          })),
+        },
+        projectView: {
+          projectId: project.id,
+          looseTodoIds: view.todos.map((t) => t.id),
+          headings: view.headings.map((g) => ({
+            headingId: g.heading.id,
+            todoIds: g.todos.map((t) => t.id),
+          })),
+        },
+        effectiveTagIds: [
+          {
+            todoId: underHeading.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, underHeading)),
+          },
+          {
+            todoId: looseInProject.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, looseInProject)),
+          },
+          {
+            todoId: inboxOnly.id,
+            tagIds: sortedIds(effectiveTagIds(w.e, inboxOnly)),
+          },
+        ],
+      }
+    })(),
+    // PLAN §16.1: Quick Find known answers (fixed ids). Native rebuilds the
+    // same seed and asserts search / homeOf. Merge-trace fixtures still to
+    // expand later.
+    find: (() => {
+      const w = new World()
+      const project = w.project({ id: 'proj-garden', title: 'Garden shed' })
+      w.todo({
+        id: 'todo-timber',
+        title: 'Buy timber',
+        notes: 'treated pine',
+        projectId: project.id,
+      })
+      const errand = w.tag({ id: 'tag-errand', title: 'Errand' })
+      w.todo({
+        id: 'todo-parcel',
+        title: 'Post parcel',
+        tagIds: [errand.id],
+      })
+      w.todo({ id: 'todo-letter', title: 'Post letter' })
+      w.project({
+        id: 'proj-trashed',
+        title: 'Old plan',
+        trashedAt: '2026-10-01T00:00:00Z',
+      })
+      w.area({
+        id: 'area-trashed',
+        title: 'Old area',
+        trashedAt: '2026-10-01T00:00:00Z',
+      })
+      const inboxTodo = w.todo({ id: 'todo-find-inbox', title: 'Inbox find' })
+      const todayTodo = w.todo({
+        id: 'todo-find-today',
+        title: 'Today find',
+        start: 'ready',
+        startDate: today,
+      })
+      const laterTodo = w.todo({
+        id: 'todo-find-later',
+        title: 'Later find',
+        start: 'later',
+      })
+      const ctx: ListContext = { today }
+      const f = buildFinder(w.e, ctx)
+      const top = (query: string) => {
+        const hit = f.search(query)[0]
+        if (!hit) return null
+        return {
+          kind: hit.kind,
+          path: hit.path,
+          todoId: hit.todoId ?? null,
+          detail: hit.detail,
+        }
+      }
+      return {
+        today,
+        seed: {
+          tags: Object.values(w.e.tags).map((t) => ({
+            id: t.id,
+            title: t.title,
+          })),
+          areas: Object.values(w.e.areas).map((a) => ({
+            id: a.id,
+            title: a.title,
+            order: a.order,
+            trashedAt: a.trashedAt ?? null,
+          })),
+          projects: Object.values(w.e.projects).map((p) => ({
+            id: p.id,
+            title: p.title,
+            areaId: p.areaId ?? null,
+            start: p.start,
+            startDate: p.startDate ?? null,
+            order: p.order,
+            trashedAt: p.trashedAt ?? null,
+          })),
+          todos: Object.values(w.e.todos).map((t) => ({
+            id: t.id,
+            title: t.title,
+            notes: t.notes,
+            start: t.start,
+            startDate: t.startDate ?? null,
+            deadline: t.deadline ?? null,
+            tonight: t.tonight,
+            status: t.status,
+            projectId: t.projectId ?? null,
+            areaId: t.areaId ?? null,
+            tagIds: t.tagIds,
+            order: t.order,
+            todayOrder: t.todayOrder ?? null,
+            trashedAt: t.trashedAt ?? null,
+            completedAt: t.completedAt ?? null,
+          })),
+        },
+        search: [
+          { query: 'tod', top: top('tod') },
+          { query: 'gard', top: top('gard') },
+          { query: 'timbr', top: top('timbr') },
+          { query: 'pine', top: top('pine') },
+          { query: 'errand', top: top('errand') },
+          { query: 'post parcel', top: top('post parcel') },
+          { query: 'old', top: top('old') },
+          { query: '', top: null },
+        ],
+        // List-level homes only: project/area home paths differ on native
+        // (destination jumps via Find result, not homeOf.list).
+        homeOf: [
+          {
+            todoId: inboxTodo.id,
+            path: homeOf(w.e, w.e.todos[inboxTodo.id]!, ctx).path,
+          },
+          {
+            todoId: todayTodo.id,
+            path: homeOf(w.e, w.e.todos[todayTodo.id]!, ctx).path,
+          },
+          {
+            todoId: laterTodo.id,
+            path: homeOf(w.e, w.e.todos[laterTodo.id]!, ctx).path,
+          },
+        ],
+      }
+    })(),
     // PLAN §16.1: list-selector snapshots (fixed ids). Rebuild the same
-    // World on native and assert selector outputs. Find / merge-trace /
-    // generated-instance fixtures still to expand later.
+    // World on native and assert selector outputs.
     lists: (() => {
       const w = new World()
       const area = w.area({ id: 'area-home', title: 'Home' })
@@ -423,6 +671,108 @@ function build() {
         },
       ],
     },
+    // PLAN §16.1: full generated-instance JSON after generateRepeats
+    // (idempotent today + catch-up keeps only the latest missed fixed date).
+    generatedInstances: (() => {
+      const templateId = 'tpl-vector-daily'
+      const day0 = '2026-10-04'
+      const dayCatchUp = '2026-10-11'
+      const template: Todo = {
+        type: 'todo',
+        id: templateId,
+        title: 'Water plants',
+        notes: 'kitchen',
+        status: 'open',
+        start: 'ready',
+        tonight: false,
+        tagIds: [],
+        order: 'a0',
+        repeat: {
+          freq: 'day',
+          every: 1,
+          mode: 'fixed',
+          anchor: day0,
+          next: day0,
+        },
+        createdAt: '2026-10-04T09:00:00.000Z',
+        updatedAt: '2026-10-04T09:00:00.000Z',
+      }
+
+      const snapInstance = (t: Todo) => ({
+        id: t.id,
+        title: t.title,
+        notes: t.notes,
+        status: t.status,
+        start: t.start,
+        startDate: t.startDate ?? null,
+        tonight: t.tonight,
+        order: t.order,
+        repeatTemplateId: t.repeatTemplateId ?? null,
+        reminderAt: t.reminderAt ?? null,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      })
+
+      const run = (today: string) => {
+        let ms = Date.parse(`${today}T09:00:00.000Z`)
+        const clock: Clock = {
+          now: () => new Date((ms += 1000)),
+          newId: () => 'unused',
+          hlc: new Hlc('vec', () => ms),
+        }
+        const store = createEntityStore(undefined, clock)
+        const e = emptyEntities()
+        e.todos[templateId] = structuredClone(template)
+        store.hydrate(e)
+        store.generate((d, env) => generateRepeats(d, env))
+        return store
+      }
+
+      const afterToday = run(day0)
+      // Idempotent second generate on the same day.
+      afterToday.generate((d, env) => generateRepeats(d, env))
+      const inst0 = afterToday.entities.todos[instanceId(templateId, day0)]!
+
+      // Catch-up: start from a template whose next is still day0 (missed week).
+      const afterAway = run(dayCatchUp)
+      const dates = Object.values(afterAway.entities.todos)
+        .filter((t) => t.repeatTemplateId === templateId)
+        .map((t) => t.startDate!)
+        .sort()
+
+      return {
+        template: {
+          id: templateId,
+          title: template.title,
+          notes: template.notes,
+          order: template.order,
+          repeat: template.repeat,
+        },
+        cases: [
+          {
+            name: 'daily-today-idempotent',
+            today: day0,
+            expect: {
+              instance: snapInstance(inst0),
+              templateNext:
+                afterToday.entities.todos[templateId]!.repeat!.next!,
+              instanceDates: [day0],
+            },
+          },
+          {
+            name: 'daily-catch-up-latest-only',
+            today: dayCatchUp,
+            expect: {
+              instanceDates: dates,
+              templateNext: afterAway.entities.todos[templateId]!.repeat!.next!,
+              latestInstance: snapInstance(
+                afterAway.entities.todos[instanceId(templateId, dayCatchUp)]!,
+              ),
+            },
+          },
+        ],
+      }
+    })(),
   }
 }
 
