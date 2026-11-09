@@ -121,6 +121,12 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src-sw',
       filename: 'sw.ts',
+      // E2E runs `vite` (dev). Serve the webmanifest there so mobile e2e can
+      // assert `display: standalone` without a production build. The SW still
+      // stays off in DEV (`src/app/pwa.ts`).
+      devOptions: {
+        enabled: process.env.DAYRULE_PWA_DEV === '1',
+      },
       injectManifest: {
         globPatterns: ['**/*.{js,css,html,svg,png,woff2,webmanifest}'],
         // The crypto worker embeds libsodium's WebAssembly (~660 KB).

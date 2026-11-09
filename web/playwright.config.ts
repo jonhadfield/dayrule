@@ -23,6 +23,7 @@ export default defineConfig({
       url: 'http://localhost:5199',
       reuseExistingServer: false,
       gracefulShutdown: { signal: 'SIGTERM', timeout: 5_000 },
+      env: { ...process.env, DAYRULE_PWA_DEV: '1' },
     },
   ],
 })

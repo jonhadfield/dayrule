@@ -1,4 +1,5 @@
-// Mobile gestures (PLAN.md §6) in an emulated phone with real touch input.
+// Mobile gestures and shell (PLAN.md §6 / §16) in an emulated phone with
+// real touch input.
 
 import { devices, expect, test, type Page } from '@playwright/test'
 import { add, signUp } from './helpers'
@@ -72,4 +73,54 @@ test('swipe to schedule, swipe to select, edge swipe back', async ({
   // Swipe in from the left edge: back to the lists.
   await swipe(page, { x: 6, y: 420 }, 150)
   await expect(page).toHaveURL(/\/$/)
+})
+
+test('full-screen editor, drag Add into the list, PWA standalone', async ({
+  page,
+}) => {
+  await signUp(page, `mobile-shell-${Date.now()}@example.com`)
+  await page.getByRole('link', { name: 'Inbox' }).tap()
+  await add(page, 'Anchor')
+
+  // Tap a row: MobileEditor opens as a full-viewport dialog with Done.
+  await page.getByRole('listitem').filter({ hasText: 'Anchor' }).tap()
+  const editor = page.getByRole('dialog', { name: 'Edit to-do' })
+  await expect(editor).toBeVisible()
+  await expect(editor.getByRole('button', { name: 'Done' })).toBeVisible()
+  const box = await editor.boundingBox()
+  const vp = page.viewportSize()
+  if (!box || !vp) throw new Error('no editor box / viewport')
+  expect(box.width).toBeGreaterThan(vp.width * 0.9)
+  expect(box.height).toBeGreaterThan(vp.height * 0.9)
+  await editor.getByLabel('Title').fill('Anchor renamed')
+  await editor.getByRole('button', { name: 'Done' }).tap()
+  await expect(editor).toHaveCount(0)
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Anchor renamed' }),
+  ).toBeVisible()
+
+  // Drag the Add pill onto a row: inserts a draft and opens the editor
+  // (MouseSensor; Playwright's drag uses mouse even on a touch project).
+  const addBtn = page.getByRole('button', { name: 'Add to-do' })
+  const anchor = page
+    .getByRole('listitem')
+    .filter({ hasText: 'Anchor renamed' })
+  await addBtn.dragTo(anchor)
+  const draft = page.getByRole('dialog', { name: 'Edit to-do' })
+  await expect(draft).toBeVisible({ timeout: 10_000 })
+  await draft.getByLabel('Title').fill('Inserted')
+  await draft.getByRole('button', { name: 'Done' }).tap()
+  await expect(
+    page.getByRole('listitem').filter({ hasText: 'Inserted' }),
+  ).toBeVisible()
+
+  // Installable PWA: webmanifest is standalone (served in e2e via DAYRULE_PWA_DEV).
+  const res = await page.request.get('/manifest.webmanifest')
+  expect(res.ok()).toBeTruthy()
+  const manifest = (await res.json()) as {
+    display?: string
+    start_url?: string
+  }
+  expect(manifest.display).toBe('standalone')
+  expect(manifest.start_url).toBe('/')
 })
