@@ -17,8 +17,9 @@ import {
   occurrenceAfter,
   occurrenceOnOrAfter,
 } from './repeat'
-import type { Repeat } from './types'
-import { instanceId } from '../store/repeats'
+import { emptyEntities, type Repeat, type Todo } from './types'
+import { generateRepeats, instanceId } from '../store/repeats'
+import { createEntityStore, type Clock } from '../store/store'
 import { World } from './fixtures'
 import { buildFinder, homeOf } from './find'
 import {
@@ -544,6 +545,110 @@ function build() {
         },
       ],
     },
+    // PLAN §16.1: full generated-instance JSON after generateRepeats
+    // (idempotent today + catch-up keeps only the latest missed fixed date).
+    generatedInstances: (() => {
+      const templateId = 'tpl-vector-daily'
+      const day0 = '2026-10-04'
+      const dayCatchUp = '2026-10-11'
+      const template: Todo = {
+        type: 'todo',
+        id: templateId,
+        title: 'Water plants',
+        notes: 'kitchen',
+        status: 'open',
+        start: 'ready',
+        tonight: false,
+        tagIds: [],
+        order: 'a0',
+        repeat: {
+          freq: 'day',
+          every: 1,
+          mode: 'fixed',
+          anchor: day0,
+          next: day0,
+        },
+        createdAt: '2026-10-04T09:00:00.000Z',
+        updatedAt: '2026-10-04T09:00:00.000Z',
+      }
+
+      const snapInstance = (t: Todo) => ({
+        id: t.id,
+        title: t.title,
+        notes: t.notes,
+        status: t.status,
+        start: t.start,
+        startDate: t.startDate ?? null,
+        tonight: t.tonight,
+        order: t.order,
+        repeatTemplateId: t.repeatTemplateId ?? null,
+        reminderAt: t.reminderAt ?? null,
+        createdAt: t.createdAt,
+        updatedAt: t.updatedAt,
+      })
+
+      const run = (today: string) => {
+        let ms = Date.parse(`${today}T09:00:00.000Z`)
+        const clock: Clock = {
+          now: () => new Date((ms += 1000)),
+          newId: () => 'unused',
+          hlc: new Hlc('vec', () => ms),
+        }
+        const store = createEntityStore(undefined, clock)
+        const e = emptyEntities()
+        e.todos[templateId] = structuredClone(template)
+        store.hydrate(e)
+        store.generate((d, env) => generateRepeats(d, env))
+        return store
+      }
+
+      const afterToday = run(day0)
+      // Idempotent second generate on the same day.
+      afterToday.generate((d, env) => generateRepeats(d, env))
+      const inst0 = afterToday.entities.todos[instanceId(templateId, day0)]!
+
+      // Catch-up: start from a template whose next is still day0 (missed week).
+      const afterAway = run(dayCatchUp)
+      const dates = Object.values(afterAway.entities.todos)
+        .filter((t) => t.repeatTemplateId === templateId)
+        .map((t) => t.startDate!)
+        .sort()
+
+      return {
+        template: {
+          id: templateId,
+          title: template.title,
+          notes: template.notes,
+          order: template.order,
+          repeat: template.repeat,
+        },
+        cases: [
+          {
+            name: 'daily-today-idempotent',
+            today: day0,
+            expect: {
+              instance: snapInstance(inst0),
+              templateNext: afterToday.entities.todos[templateId]!.repeat!.next!,
+              instanceDates: [day0],
+            },
+          },
+          {
+            name: 'daily-catch-up-latest-only',
+            today: dayCatchUp,
+            expect: {
+              instanceDates: dates,
+              templateNext:
+                afterAway.entities.todos[templateId]!.repeat!.next!,
+              latestInstance: snapInstance(
+                afterAway.entities.todos[
+                  instanceId(templateId, dayCatchUp)
+                ]!,
+              ),
+            },
+          },
+        ],
+      }
+    })(),
   }
 }
 
