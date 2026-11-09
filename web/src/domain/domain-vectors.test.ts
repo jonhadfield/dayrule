@@ -628,7 +628,8 @@ function build() {
             today: day0,
             expect: {
               instance: snapInstance(inst0),
-              templateNext: afterToday.entities.todos[templateId]!.repeat!.next!,
+              templateNext:
+                afterToday.entities.todos[templateId]!.repeat!.next!,
               instanceDates: [day0],
             },
           },
@@ -637,12 +638,9 @@ function build() {
             today: dayCatchUp,
             expect: {
               instanceDates: dates,
-              templateNext:
-                afterAway.entities.todos[templateId]!.repeat!.next!,
+              templateNext: afterAway.entities.todos[templateId]!.repeat!.next!,
               latestInstance: snapInstance(
-                afterAway.entities.todos[
-                  instanceId(templateId, dayCatchUp)
-                ]!,
+                afterAway.entities.todos[instanceId(templateId, dayCatchUp)]!,
               ),
             },
           },
