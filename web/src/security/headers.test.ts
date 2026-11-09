@@ -15,6 +15,7 @@ const vercel = JSON.parse(
 ) as {
   headers: Rule[]
   crons?: { path: string; schedule: string }[]
+  services: { web: { rewrites: { source: string; destination: string }[] } }
 }
 const global = vercel.headers.find(
   (r) => r.source === '/(.*)' && !r.has && !r.missing,
@@ -100,6 +101,18 @@ describe('security headers', () => {
     )
     for (const tag of html.match(/<script\b[^>]*>/g) ?? [])
       expect(tag).toMatch(/\ssrc=/)
+  })
+
+  it('does not SPA-rewrite robots.txt or sitemap.xml', () => {
+    const spa = (
+      vercel as {
+        services: {
+          web: { rewrites: { source: string; destination: string }[] }
+        }
+      }
+    ).services.web.rewrites.find((r) => r.destination === '/index.html')
+    expect(spa?.source).toContain('robots\\.txt$')
+    expect(spa?.source).toContain('sitemap\\.xml$')
   })
 
   it('serves apple-app-site-association as JSON (native webcredentials)', () => {
