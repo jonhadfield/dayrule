@@ -393,6 +393,369 @@
       }
     ]
   },
+  "organisation": {
+    "today": "2026-10-04",
+    "seed": {
+      "tags": [
+        {
+          "id": "tag-area",
+          "title": "Home"
+        },
+        {
+          "id": "tag-project",
+          "title": "Build"
+        },
+        {
+          "id": "tag-todo",
+          "title": "Errand"
+        }
+      ],
+      "areas": [
+        {
+          "id": "area-org",
+          "title": "House",
+          "tagIds": [
+            "tag-area"
+          ],
+          "order": "a0"
+        }
+      ],
+      "projects": [
+        {
+          "id": "proj-org",
+          "title": "Kitchen",
+          "areaId": "area-org",
+          "tagIds": [
+            "tag-project"
+          ],
+          "order": "a0"
+        }
+      ],
+      "headings": [
+        {
+          "id": "head-prep",
+          "title": "Prep",
+          "projectId": "proj-org",
+          "archived": false,
+          "order": "a0"
+        },
+        {
+          "id": "head-old",
+          "title": "Old",
+          "projectId": "proj-org",
+          "archived": true,
+          "order": "a1"
+        }
+      ],
+      "todos": [
+        {
+          "id": "todo-under-heading",
+          "title": "Buy tiles",
+          "projectId": "proj-org",
+          "headingId": "head-prep",
+          "areaId": null,
+          "start": "ready",
+          "tagIds": [
+            "tag-todo"
+          ],
+          "order": "a0"
+        },
+        {
+          "id": "todo-project-loose",
+          "title": "Measure bench",
+          "projectId": "proj-org",
+          "headingId": null,
+          "areaId": null,
+          "start": "ready",
+          "tagIds": [],
+          "order": "a1"
+        },
+        {
+          "id": "todo-archived-heading",
+          "title": "Legacy note",
+          "projectId": "proj-org",
+          "headingId": "head-old",
+          "areaId": null,
+          "start": "ready",
+          "tagIds": [],
+          "order": "a2"
+        },
+        {
+          "id": "todo-inbox-tags",
+          "title": "Post letter",
+          "projectId": null,
+          "headingId": null,
+          "areaId": null,
+          "start": "inbox",
+          "tagIds": [
+            "tag-todo"
+          ],
+          "order": "a3"
+        }
+      ]
+    },
+    "projectView": {
+      "projectId": "proj-org",
+      "looseTodoIds": [
+        "todo-project-loose",
+        "todo-archived-heading"
+      ],
+      "headings": [
+        {
+          "headingId": "head-prep",
+          "todoIds": [
+            "todo-under-heading"
+          ]
+        }
+      ]
+    },
+    "effectiveTagIds": [
+      {
+        "todoId": "todo-under-heading",
+        "tagIds": [
+          "tag-area",
+          "tag-project",
+          "tag-todo"
+        ]
+      },
+      {
+        "todoId": "todo-project-loose",
+        "tagIds": [
+          "tag-area",
+          "tag-project"
+        ]
+      },
+      {
+        "todoId": "todo-inbox-tags",
+        "tagIds": [
+          "tag-todo"
+        ]
+      }
+    ]
+  },
+  "find": {
+    "today": "2026-10-04",
+    "seed": {
+      "tags": [
+        {
+          "id": "tag-errand",
+          "title": "Errand"
+        }
+      ],
+      "areas": [
+        {
+          "id": "area-trashed",
+          "title": "Old area",
+          "order": "a0",
+          "trashedAt": "2026-10-01T00:00:00Z"
+        }
+      ],
+      "projects": [
+        {
+          "id": "proj-garden",
+          "title": "Garden shed",
+          "areaId": null,
+          "start": "ready",
+          "startDate": null,
+          "order": "a0",
+          "trashedAt": null
+        },
+        {
+          "id": "proj-trashed",
+          "title": "Old plan",
+          "areaId": null,
+          "start": "ready",
+          "startDate": null,
+          "order": "a1",
+          "trashedAt": "2026-10-01T00:00:00Z"
+        }
+      ],
+      "todos": [
+        {
+          "id": "todo-timber",
+          "title": "Buy timber",
+          "notes": "treated pine",
+          "start": "inbox",
+          "startDate": null,
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": "proj-garden",
+          "areaId": null,
+          "tagIds": [],
+          "order": "a0",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        },
+        {
+          "id": "todo-parcel",
+          "title": "Post parcel",
+          "notes": "",
+          "start": "inbox",
+          "startDate": null,
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": null,
+          "areaId": null,
+          "tagIds": [
+            "tag-errand"
+          ],
+          "order": "a1",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        },
+        {
+          "id": "todo-letter",
+          "title": "Post letter",
+          "notes": "",
+          "start": "inbox",
+          "startDate": null,
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": null,
+          "areaId": null,
+          "tagIds": [],
+          "order": "a2",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        },
+        {
+          "id": "todo-find-inbox",
+          "title": "Inbox find",
+          "notes": "",
+          "start": "inbox",
+          "startDate": null,
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": null,
+          "areaId": null,
+          "tagIds": [],
+          "order": "a3",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        },
+        {
+          "id": "todo-find-today",
+          "title": "Today find",
+          "notes": "",
+          "start": "ready",
+          "startDate": "2026-10-04",
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": null,
+          "areaId": null,
+          "tagIds": [],
+          "order": "a4",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        },
+        {
+          "id": "todo-find-later",
+          "title": "Later find",
+          "notes": "",
+          "start": "later",
+          "startDate": null,
+          "deadline": null,
+          "tonight": false,
+          "status": "open",
+          "projectId": null,
+          "areaId": null,
+          "tagIds": [],
+          "order": "a5",
+          "todayOrder": null,
+          "trashedAt": null,
+          "completedAt": null
+        }
+      ]
+    },
+    "search": [
+      {
+        "query": "tod",
+        "top": {
+          "kind": "list",
+          "path": "/today",
+          "todoId": null,
+          "detail": "List"
+        }
+      },
+      {
+        "query": "gard",
+        "top": {
+          "kind": "project",
+          "path": "/project/proj-garden",
+          "todoId": null,
+          "detail": "Project"
+        }
+      },
+      {
+        "query": "timbr",
+        "top": {
+          "kind": "todo",
+          "path": "/project/proj-garden",
+          "todoId": "todo-timber",
+          "detail": "Garden shed"
+        }
+      },
+      {
+        "query": "pine",
+        "top": {
+          "kind": "todo",
+          "path": "/project/proj-garden",
+          "todoId": "todo-timber",
+          "detail": "Garden shed"
+        }
+      },
+      {
+        "query": "errand",
+        "top": {
+          "kind": "todo",
+          "path": "/inbox",
+          "todoId": "todo-parcel",
+          "detail": "Inbox"
+        }
+      },
+      {
+        "query": "post parcel",
+        "top": {
+          "kind": "todo",
+          "path": "/inbox",
+          "todoId": "todo-parcel",
+          "detail": "Inbox"
+        }
+      },
+      {
+        "query": "old",
+        "top": null
+      },
+      {
+        "query": "",
+        "top": null
+      }
+    ],
+    "homeOf": [
+      {
+        "todoId": "todo-find-inbox",
+        "path": "/inbox"
+      },
+      {
+        "todoId": "todo-find-today",
+        "path": "/today"
+      },
+      {
+        "todoId": "todo-find-later",
+        "path": "/backlog"
+      }
+    ]
+  },
   "lists": {
     "today": "2026-10-04",
     "seed": {
@@ -787,6 +1150,71 @@
         },
         "done": "2026-01-31",
         "result": "2026-02-28"
+      }
+    ]
+  },
+  "generatedInstances": {
+    "template": {
+      "id": "tpl-vector-daily",
+      "title": "Water plants",
+      "notes": "kitchen",
+      "order": "a0",
+      "repeat": {
+        "freq": "day",
+        "every": 1,
+        "mode": "fixed",
+        "anchor": "2026-10-04",
+        "next": "2026-10-04"
+      }
+    },
+    "cases": [
+      {
+        "name": "daily-today-idempotent",
+        "today": "2026-10-04",
+        "expect": {
+          "instance": {
+            "id": "efab2ed0-45b3-581e-ab42-42e9ea2090cd",
+            "title": "Water plants",
+            "notes": "kitchen",
+            "status": "open",
+            "start": "ready",
+            "startDate": "2026-10-04",
+            "tonight": false,
+            "order": "a0",
+            "repeatTemplateId": "tpl-vector-daily",
+            "reminderAt": null,
+            "createdAt": "2026-10-04T00:00:00.000Z",
+            "updatedAt": "2026-10-04T00:00:00.000Z"
+          },
+          "templateNext": "2026-10-05",
+          "instanceDates": [
+            "2026-10-04"
+          ]
+        }
+      },
+      {
+        "name": "daily-catch-up-latest-only",
+        "today": "2026-10-11",
+        "expect": {
+          "instanceDates": [
+            "2026-10-11"
+          ],
+          "templateNext": "2026-10-12",
+          "latestInstance": {
+            "id": "67da9deb-c49e-578c-8982-fd46278ada60",
+            "title": "Water plants",
+            "notes": "kitchen",
+            "status": "open",
+            "start": "ready",
+            "startDate": "2026-10-11",
+            "tonight": false,
+            "order": "a0",
+            "repeatTemplateId": "tpl-vector-daily",
+            "reminderAt": null,
+            "createdAt": "2026-10-11T00:00:00.000Z",
+            "updatedAt": "2026-10-11T00:00:00.000Z"
+          }
+        }
       }
     ]
   }
