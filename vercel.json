@@ -9,7 +9,7 @@
       "outputDirectory": "dist",
       "rewrites": [
         {
-          "source": "/((?!\\.well-known/).*)",
+          "source": "/((?!\\.well-known/|robots\\.txt$|sitemap\\.xml$).*)",
           "destination": "/index.html"
         }
       ]
