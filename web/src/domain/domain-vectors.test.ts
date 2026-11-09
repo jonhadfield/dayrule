@@ -12,6 +12,13 @@ import {
   type Clocked,
 } from './merge'
 import { compareKeys, keyBetween, keysBetween } from './order'
+import {
+  dueAfterCompletion,
+  occurrenceAfter,
+  occurrenceOnOrAfter,
+} from './repeat'
+import type { Repeat } from './types'
+import { instanceId } from '../store/repeats'
 
 type MergeE = Clocked & {
   id: string
@@ -113,6 +120,24 @@ function build() {
     clock: { id: '1', title: '5' },
   }
 
+  const rule = (r: Partial<Repeat>): Repeat => ({
+    freq: 'day',
+    every: 1,
+    mode: 'fixed',
+    anchor: '2026-10-04',
+    ...r,
+  })
+
+  /** Successive occurrences from the anchor (same helper as repeat.test.ts). */
+  function first(r: Repeat, n: number): string[] {
+    const out = [occurrenceOnOrAfter(r, r.anchor)]
+    while (out.length < n) out.push(occurrenceAfter(r, out[out.length - 1]!))
+    return out
+  }
+
+  const templateId = '6b0f3c55-0000-4000-8000-000000000001'
+  const instanceDate = '2026-10-04'
+
   return {
     version: 2,
     parseWhen: parseWhenCases,
@@ -169,6 +194,94 @@ function build() {
         },
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
+    },
+    // PLAN §16.1: repeat sequences + instanceId (31st clamp, 29 Feb, DST,
+    // weekly sets, after-completion). Expand further when list-selector /
+    // merge-trace fixtures land.
+    repeats: {
+      instanceId: [
+        {
+          templateId,
+          date: instanceDate,
+          result: instanceId(templateId, instanceDate),
+        },
+      ],
+      sequences: [
+        {
+          name: 'every-3-days',
+          rule: rule({ every: 3 }),
+          count: 3,
+          result: first(rule({ every: 3 }), 3),
+        },
+        {
+          name: 'weekly-mon-thu',
+          rule: rule({ freq: 'week', weekdays: [0, 3] }),
+          count: 4,
+          result: first(rule({ freq: 'week', weekdays: [0, 3] }), 4),
+        },
+        {
+          name: 'fortnightly-monday',
+          rule: rule({
+            freq: 'week',
+            every: 2,
+            weekdays: [0],
+            anchor: '2026-10-05',
+          }),
+          count: 3,
+          result: first(
+            rule({
+              freq: 'week',
+              every: 2,
+              weekdays: [0],
+              anchor: '2026-10-05',
+            }),
+            3,
+          ),
+        },
+        {
+          name: 'monthly-31st-clamp',
+          rule: rule({ freq: 'month', anchor: '2026-01-31' }),
+          count: 4,
+          result: first(rule({ freq: 'month', anchor: '2026-01-31' }), 4),
+        },
+        {
+          name: 'yearly-29-feb',
+          rule: rule({ freq: 'year', anchor: '2028-02-29' }),
+          count: 3,
+          result: first(rule({ freq: 'year', anchor: '2028-02-29' }), 3),
+        },
+        {
+          name: 'daily-across-uk-dst',
+          rule: rule({ anchor: '2026-10-24' }),
+          count: 3,
+          result: first(rule({ anchor: '2026-10-24' }), 3),
+        },
+      ],
+      onOrAfter: [
+        {
+          rule: rule({ every: 3 }),
+          from: '2026-10-05',
+          result: occurrenceOnOrAfter(rule({ every: 3 }), '2026-10-05'),
+        },
+      ],
+      dueAfterCompletion: [
+        {
+          rule: rule({ every: 3, mode: 'afterCompletion' }),
+          done: '2026-10-04',
+          result: dueAfterCompletion(
+            rule({ every: 3, mode: 'afterCompletion' }),
+            '2026-10-04',
+          ),
+        },
+        {
+          rule: rule({ freq: 'month', mode: 'afterCompletion' }),
+          done: '2026-01-31',
+          result: dueAfterCompletion(
+            rule({ freq: 'month', mode: 'afterCompletion' }),
+            '2026-01-31',
+          ),
+        },
+      ],
     },
   }
 }
