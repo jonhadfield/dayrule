@@ -211,14 +211,14 @@ function build() {
     find: (() => {
       const w = new World()
       const project = w.project({ id: 'proj-garden', title: 'Garden shed' })
-      const timber = w.todo({
+      w.todo({
         id: 'todo-timber',
         title: 'Buy timber',
         notes: 'treated pine',
         projectId: project.id,
       })
       const errand = w.tag({ id: 'tag-errand', title: 'Errand' })
-      const parcel = w.todo({
+      w.todo({
         id: 'todo-parcel',
         title: 'Post parcel',
         tagIds: [errand.id],
