@@ -1,3 +1,5 @@
+import { useEffect } from 'react'
+import { setDocumentTitle } from '../../app/documentTitle'
 import { TOPICS, type TopicSlug } from './topics'
 import { Article } from './articles'
 
@@ -10,6 +12,10 @@ export function HelpPage({ path }: { path: string }) {
   const topic = TOPICS.find((t) => t.slug === slug)
   const index = TOPICS.findIndex((t) => t.slug === slug)
   const next = index >= 0 ? TOPICS[index + 1] : undefined
+
+  useEffect(() => {
+    setDocumentTitle(topic ? `${topic.title} · Dayrule Help` : 'Help · Dayrule')
+  }, [topic])
 
   return (
     <div className="mx-auto flex max-w-[1000px] gap-10 px-5 pt-[max(env(safe-area-inset-top),24px)] pb-16">
