@@ -20,6 +20,7 @@ import {
 import type { Repeat } from './types'
 import { instanceId } from '../store/repeats'
 import { World } from './fixtures'
+import { buildFinder, homeOf } from './find'
 import {
   inbox,
   notNow,
@@ -204,9 +205,129 @@ function build() {
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
     },
-    // PLAN §16.1: list-selector snapshots (fixed ids). Rebuild the same
-    // World on native and assert selector outputs. Find / merge-trace /
+    // PLAN §16.1: Quick Find known answers (fixed ids). Native rebuilds the
+    // same seed and asserts search / homeOf. Merge-trace and full
     // generated-instance fixtures still to expand later.
+    find: (() => {
+      const w = new World()
+      const project = w.project({ id: 'proj-garden', title: 'Garden shed' })
+      w.todo({
+        id: 'todo-timber',
+        title: 'Buy timber',
+        notes: 'treated pine',
+        projectId: project.id,
+      })
+      const errand = w.tag({ id: 'tag-errand', title: 'Errand' })
+      w.todo({
+        id: 'todo-parcel',
+        title: 'Post parcel',
+        tagIds: [errand.id],
+      })
+      w.todo({ id: 'todo-letter', title: 'Post letter' })
+      w.project({
+        id: 'proj-trashed',
+        title: 'Old plan',
+        trashedAt: '2026-10-01T00:00:00Z',
+      })
+      w.area({
+        id: 'area-trashed',
+        title: 'Old area',
+        trashedAt: '2026-10-01T00:00:00Z',
+      })
+      const inboxTodo = w.todo({ id: 'todo-find-inbox', title: 'Inbox find' })
+      const todayTodo = w.todo({
+        id: 'todo-find-today',
+        title: 'Today find',
+        start: 'ready',
+        startDate: today,
+      })
+      const laterTodo = w.todo({
+        id: 'todo-find-later',
+        title: 'Later find',
+        start: 'later',
+      })
+      const ctx: ListContext = { today }
+      const f = buildFinder(w.e, ctx)
+      const top = (query: string) => {
+        const hit = f.search(query)[0]
+        if (!hit) return null
+        return {
+          kind: hit.kind,
+          path: hit.path,
+          todoId: hit.todoId ?? null,
+          detail: hit.detail,
+        }
+      }
+      return {
+        today,
+        seed: {
+          tags: Object.values(w.e.tags).map((t) => ({
+            id: t.id,
+            title: t.title,
+          })),
+          areas: Object.values(w.e.areas).map((a) => ({
+            id: a.id,
+            title: a.title,
+            order: a.order,
+            trashedAt: a.trashedAt ?? null,
+          })),
+          projects: Object.values(w.e.projects).map((p) => ({
+            id: p.id,
+            title: p.title,
+            areaId: p.areaId ?? null,
+            start: p.start,
+            startDate: p.startDate ?? null,
+            order: p.order,
+            trashedAt: p.trashedAt ?? null,
+          })),
+          todos: Object.values(w.e.todos).map((t) => ({
+            id: t.id,
+            title: t.title,
+            notes: t.notes,
+            start: t.start,
+            startDate: t.startDate ?? null,
+            deadline: t.deadline ?? null,
+            tonight: t.tonight,
+            status: t.status,
+            projectId: t.projectId ?? null,
+            areaId: t.areaId ?? null,
+            tagIds: t.tagIds,
+            order: t.order,
+            todayOrder: t.todayOrder ?? null,
+            trashedAt: t.trashedAt ?? null,
+            completedAt: t.completedAt ?? null,
+          })),
+        },
+        search: [
+          { query: 'tod', top: top('tod') },
+          { query: 'gard', top: top('gard') },
+          { query: 'timbr', top: top('timbr') },
+          { query: 'pine', top: top('pine') },
+          { query: 'errand', top: top('errand') },
+          { query: 'post parcel', top: top('post parcel') },
+          { query: 'old', top: top('old') },
+          { query: '', top: null },
+        ],
+        // List-level homes only: project/area home paths differ on native
+        // (destination jumps via Find result, not homeOf.list).
+        homeOf: [
+          {
+            todoId: inboxTodo.id,
+            path: homeOf(w.e, w.e.todos[inboxTodo.id]!, ctx).path,
+          },
+          {
+            todoId: todayTodo.id,
+            path: homeOf(w.e, w.e.todos[todayTodo.id]!, ctx).path,
+          },
+          {
+            todoId: laterTodo.id,
+            path: homeOf(w.e, w.e.todos[laterTodo.id]!, ctx).path,
+          },
+        ],
+      }
+    })(),
+    // PLAN §16.1: list-selector snapshots (fixed ids). Rebuild the same
+    // World on native and assert selector outputs.
     lists: (() => {
       const w = new World()
       const area = w.area({ id: 'area-home', title: 'Home' })
