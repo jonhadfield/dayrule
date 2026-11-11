@@ -310,3 +310,136 @@ describe('keepVisible', () => {
     ).toEqual([t.id])
   })
 })
+
+/**
+ * PLAN §16 DoD: one seed vault that asserts every §4.1 list rule together
+ * (unit cases above cover edges; this is the single acceptance walk).
+ */
+describe('PLAN §4.1 acceptance', () => {
+  it('places one vault’s items into Inbox, Today, Scheduled, Backlog, Not now, Done and Trash', () => {
+    const w = new World()
+    w.e.settings.moveToDone = 'immediately'
+    const day: ListContext = { today: '2026-10-04' }
+
+    const area = w.area({ title: 'Home' })
+    const kitchen = w.project({ title: 'Kitchen', areaId: area.id })
+    const laterProj = w.project({ title: 'Someday', start: 'later' })
+    const heading = w.heading({ projectId: kitchen.id, title: 'Chores' })
+
+    const inboxItem = w.todo({ title: 'Buy milk' })
+    const todayStarted = w.todo({
+      title: 'Today chore',
+      start: 'ready',
+      startDate: '2026-10-04',
+      todayOrder: 'a1',
+    })
+    const overdue = w.todo({
+      title: 'Overdue',
+      start: 'ready',
+      deadline: '2026-09-30',
+      todayOrder: 'a0',
+    })
+    const tomorrow = w.todo({
+      title: 'Tomorrow',
+      start: 'ready',
+      startDate: '2026-10-05',
+    })
+    const nextMonth = w.todo({
+      title: 'November',
+      start: 'ready',
+      startDate: '2026-11-20',
+    })
+    const backlogLoose = w.todo({ title: 'Anytime', start: 'ready' })
+    const backlogInProject = w.todo({
+      title: 'Clean sink',
+      start: 'ready',
+      projectId: kitchen.id,
+      headingId: heading.id,
+    })
+    const notNowTodo = w.todo({ title: 'Maybe later', start: 'later' })
+    // In a Not now project: hidden from Today even with a When of today.
+    w.todo({
+      title: 'Someday chore',
+      start: 'ready',
+      startDate: '2026-10-04',
+      projectId: laterProj.id,
+    })
+    const logged = w.todo({
+      title: 'Finished',
+      status: 'completed',
+      completedAt: '2026-10-03T12:00:00Z',
+    })
+    const trashed = w.todo({
+      title: 'Gone',
+      trashedAt: '2026-10-02T00:00:00Z',
+    })
+    // Repeating template: only in Scheduled as its next date (§4.2).
+    const template = w.todo({
+      title: 'Daily template',
+      start: 'ready',
+      repeat: {
+        freq: 'day',
+        every: 1,
+        mode: 'fixed',
+        anchor: '2026-10-01',
+        next: '2026-10-06',
+      },
+    })
+
+    expect(ids(inbox(w.e, day))).toEqual([inboxItem.id])
+
+    // Overdue deadline + started today; Not now project child excluded.
+    expect(ids(today(w.e, day))).toEqual([overdue.id, todayStarted.id])
+
+    const sched = scheduled(w.e, day)
+    expect(ids(sched.days[0]?.items ?? [])).toEqual([tomorrow.id])
+    expect(ids(sched.days[1]?.items ?? [])).toEqual([template.id])
+    expect(sched.months.map((m) => [m.month, ids(m.items)] as const)).toEqual([
+      ['2026-11', [nextMonth.id]],
+    ])
+    expect(sched.waiting).toEqual([])
+
+    const backlogIds = new Set(
+      backlog(w.e, day).flatMap((g) => g.todos.map((t) => t.id)),
+    )
+    // Undated ready items (and today’s When, which is also “available”).
+    expect(backlogIds).toEqual(
+      new Set([
+        backlogLoose.id,
+        backlogInProject.id,
+        todayStarted.id,
+        overdue.id,
+      ]),
+    )
+    expect(backlogIds.has(tomorrow.id)).toBe(false)
+    expect(backlogIds.has(notNowTodo.id)).toBe(false)
+
+    const aside = notNow(w.e, day)
+    expect(ids(aside.projects)).toEqual([laterProj.id])
+    expect(ids(aside.todos)).toEqual([notNowTodo.id])
+
+    expect(doneList(w.e, day).flatMap((d) => d.items.map((i) => i.id))).toEqual(
+      [logged.id],
+    )
+    expect(ids(trash(w.e).items)).toEqual([trashed.id])
+
+    // Template stays out of every ordinary list.
+    expect(ids(inbox(w.e, day))).not.toContain(template.id)
+    expect(ids(today(w.e, day))).not.toContain(template.id)
+    expect(backlogIds.has(template.id)).toBe(false)
+
+    const view = projectView(w.e, kitchen.id, day)
+    expect(ids(view?.todos ?? [])).toEqual([])
+    expect(view?.headings.map((g) => ids(g.todos))).toEqual([
+      [backlogInProject.id],
+    ])
+    expect(ids(areaView(w.e, area.id, day)?.projects ?? [])).toEqual([
+      kitchen.id,
+    ])
+    expect(sidebarCounts(w.e, day)).toEqual({
+      inbox: 1,
+      today: 2,
+      overdue: 1,
+    })
+  })
+})
