@@ -5,6 +5,12 @@
 *.pem
 *.key
 
+# Local plan / decisions (not published)
+PLAN.md
+
+# Internal / agent working notes
+claudedocs/
+
 # Vercel
 .vercel/
 
@@ -60,3 +66,7 @@ skills-lock.json
 
 # Playwright MCP output
 .playwright-mcp/
+
+# things-export plaintext output
+things.json
+**/things.json

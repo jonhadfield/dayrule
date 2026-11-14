@@ -1,7 +1,7 @@
 # Dayrule threat model
 
-Reviewed 2026-10-04 (M7). Summary in PLAN.md §10.1; this is the full version.
-It describes what Dayrule protects, from whom, how, and what it does not
+Reviewed 2026-10-04 (M7). This is the full threat model for the web app and
+API. It describes what Dayrule protects, from whom, how, and what it does not
 protect against. Where a control is enforced in code or CI, the location is
 given so it can be checked.
 

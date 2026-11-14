@@ -1,10 +1,13 @@
 # Dayrule
 
 A calm task manager for desktop and mobile web, with client-side
-(end-to-end) encryption and its own "paper and ink" identity. `PLAN.md` is the source of truth for the product,
-architecture and decisions (decisions log: §17). Read the relevant section
-before changing behaviour, and update `PLAN.md` in the same PR when a decision
-changes.
+(end-to-end) encryption and a paper-and-ink identity.
+
+Product and architecture decisions live in a local `PLAN.md` (gitignored,
+not published). Read the relevant section before changing behaviour, and
+update that local plan when a decision changes. Shared crypto, sync and
+wire behaviour must stay compatible with companion clients (including the
+native app).
 
 ## Layout
 
@@ -12,8 +15,8 @@ changes.
 - `server/` — Go API (`cmd/dayruled`), migrations (`migrations/`, goose,
   embedded), migration runner (`cmd/migrate`), local CLI/MCP (`cmd/dayrule`;
   see `docs/cli-mcp.md`).
-- `tools/things-export/` — read-only Things 3 → JSON exporter (PLAN §8.3;
-  import via Account → Your data).
+- `tools/things-export/` — read-only Things 3 → JSON exporter (import via
+  Account → Your data).
 - `vercel.json` — Vercel Services: `web` (static) and `api` (Go Function);
   `/api/*` goes to the API, everything else to the SPA.
 
@@ -63,7 +66,6 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 - Never commit to `main` or `preview` directly; both are protected. Work on a
   feature branch → PR into `preview` → check on `preview.dayrule.app` → PR
   `preview` into `main` (merge commit, not squash, so histories stay aligned).
-- Do not commit between 09:00 and 17:00 Europe/London, Monday to Friday.
 - Migrations must be backwards-compatible (expand → migrate → contract): the
   previous deployment keeps serving during a rollout. They run in the Vercel
   build only for production and the `preview` branch
@@ -71,11 +73,9 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 
 ## Identity rules
 
-- Dayrule must never be mistakable for another task manager (PLAN.md §5,
-  decisions 20, 21 and 26). Use Dayrule's own vocabulary in UI and code:
-  Inbox, Today, Scheduled, Backlog, Not now, Done, Trash, Add. Never borrow
-  another product's list or feature names, colours, icons or layouts.
-- Use the design tokens in `web/src/styles/tokens.css`; don't hard-code
+- Use Dayrule’s own vocabulary in UI and code: Inbox, Today, Scheduled,
+  Backlog, Not now, Done, Trash, Add.
+- Use the design tokens in `web/src/styles/tokens.css`; don’t hard-code
   colours.
 
 ## Databases
@@ -86,14 +86,16 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
 ## Security rules (non-negotiable)
 
 - The server must never see plaintext user content. Encryption happens in the
-  browser (PLAN.md §10). Never log request or response bodies.
+  browser. Never log request or response bodies.
 - 256-bit symmetric keys only; no classical-only public-key crypto protecting
-  user data (PLAN.md §10.8).
+  user data.
 - No third-party scripts, analytics or trackers; the CSP in `vercel.json`
   enforces `'self'` only. The one exception is `connect-src
-  https://api.pwnedpasswords.com` for the breached-password check
-  (decision 31); don't add others.
-- Never test Firewall rate limits from the owner's connection against production: a block applies to that IP for the whole site. Firewall rules must not use persistent actions (`actionDuration`).
+  https://api.pwnedpasswords.com` for the breached-password check;
+  don’t add others.
+- Never test Firewall rate limits from the owner’s connection against
+  production: a block applies to that IP for the whole site. Firewall rules
+  must not use persistent actions (`actionDuration`).
 - Never write secrets into code, docs, commits or PR text. Use env var names
   (`DATABASE_URL`, `RESEND_API_KEY`, …). Get values with `vercel env pull`
   into `.env.local` (gitignored).

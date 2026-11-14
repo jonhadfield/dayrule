@@ -1,7 +1,7 @@
 # things-export
 
 Read-only export of a [Things 3](https://culturedcode.com/things/) Mac
-database into JSON that Dayrule can import (PLAN.md §8.3).
+database into JSON that Dayrule can import.
 
 The tool never writes to the Things database. Mapping to Dayrule entities and
 encryption happen in the browser when you use **Account → Your data → Import
