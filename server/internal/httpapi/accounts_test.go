@@ -54,12 +54,14 @@ func newHarness(t *testing.T) *harness {
 	acc := &Accounts{Store: hs.store, Keys: keys, Email: hs.mail, InviteOnly: true,
 		Now: func() time.Time { return hs.now }, Passkeys: passkeys}
 	hs.records = store.Records{Accounts: hs.store}
-	sync := &Sync{Accounts: acc, Store: hs.records, CronSecret: "cron-test-secret"}
+	errStore := store.ErrorReports{Pool: pool}
+	sync := &Sync{Accounts: acc, Store: hs.records, Errors: errStore, CronSecret: "cron-test-secret"}
 	hs.push = &push.Memory{Gone: map[string]bool{}}
 	reminders := &Reminders{Accounts: acc, Store: store.Reminders{Accounts: hs.store}, Push: hs.push,
 		VAPIDPublicKey: "test-vapid-public", CronSecret: "cron-test-secret"}
+	errs := &Errors{Accounts: acc, Store: errStore}
 	hs.h = NewHandler(Config{Version: "test", Accounts: acc, Sync: sync, Reminders: reminders,
-		Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
+		Errors: errs, Logger: slog.New(slog.NewTextHandler(io.Discard, nil))})
 	hs.invite = hs.newInvite()
 	return hs
 }

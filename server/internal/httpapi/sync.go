@@ -18,6 +18,7 @@ import (
 type Sync struct {
 	Accounts   *Accounts
 	Store      store.Records
+	Errors     store.ErrorReports
 	CronSecret string
 }
 
@@ -178,5 +179,17 @@ func (s *Sync) gc(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int64{"purgedTombstones": purged, "resetWarnings": int64(reminded)})
+	var purgedReports int64
+	if s.Errors.Pool != nil {
+		purgedReports, err = s.Errors.PurgeOlderThan(r.Context(), s.Accounts.Now(), errorReportTTL)
+		if err != nil {
+			writeErr(w, err)
+			return
+		}
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{
+		"purgedTombstones": purged,
+		"resetWarnings":    int64(reminded),
+		"purgedReports":    purgedReports,
+	})
 }

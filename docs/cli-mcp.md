@@ -20,6 +20,9 @@ go build -o dayrule ./cmd/dayrule
 | `DAYRULE_EMAIL` | or this | Account email |
 | `DAYRULE_PASSWORD` | or this | Password (CLI trims surrounding whitespace) |
 | `DAYRULE_API` | no | Origin (default `https://dayrule.app`) |
+| `DAYRULE_TOTP_SECRET` | if two-step | Base32 authenticator secret; CLI mints the current code |
+| `DAYRULE_TOTP_CODE` | or this | One 6-digit code (useful in tests) |
+| `DAYRULE_BACKUP_CODE` | or this | One unused backup code |
 
 `bad_login` is returned **before** any two-step check. It only means the
 email/password pair did not match (unknown email uses the same message).
@@ -33,8 +36,9 @@ export DAYRULE_CREDS=$HOME/.config/dayrule/creds
 ./dayrule doctor
 ```
 
-Accounts with two-step sign-in are not supported yet (turn the second step off
-on a dedicated agent account, or wait for a later CLI release).
+Accounts with two-step sign-in need a TOTP secret/code or a backup code in the
+environment (passkeys are not supported in the CLI). Prefer a dedicated agent
+account with an authenticator app, or turn two-step off for that account.
 
 ## CLI
 
