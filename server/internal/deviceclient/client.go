@@ -9,16 +9,19 @@ package deviceclient
 import (
 	"bytes"
 	"context"
+	"encoding/base32"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 
+	"github.com/jonhadfield/dayrule/server/internal/auth"
 	"github.com/jonhadfield/dayrule/server/internal/clientcrypto"
 )
 
@@ -106,7 +109,13 @@ func Login(ctx context.Context, api, email, password string) (*Session, error) {
 	}
 	wipe(authKey)
 	if len(login.SecondStep) > 0 && string(login.SecondStep) != "null" {
-		return nil, fmt.Errorf("account has two-step sign-in; turn it off for the CLI device or add CLI second-step support")
+		finished, err := finishSecondStep(ctx, client, api, login.SecondStep)
+		if err != nil {
+			return nil, err
+		}
+		login.UserID = finished.UserID
+		login.Token = finished.Token
+		login.WrappedPassword = finished.WrappedPassword
 	}
 	if login.Token == "" {
 		return nil, fmt.Errorf("no bearer token (API must see a native X-Dayrule-Client)")
@@ -133,6 +142,64 @@ func Login(ctx context.Context, api, email, password string) (*Session, error) {
 		API: api, Email: email, UserID: login.UserID, Token: login.Token,
 		AK: ak, HTTP: client, syncIDKey: syncIDKey,
 	}, nil
+}
+
+type loginResult struct {
+	UserID          string   `json:"userId"`
+	Token           string   `json:"token"`
+	WrappedPassword wrapBlob `json:"wrappedPassword"`
+}
+
+// finishSecondStep completes login with a TOTP or backup code from the
+// environment (DAYRULE_TOTP_CODE, DAYRULE_BACKUP_CODE, or DAYRULE_TOTP_SECRET).
+// Passkeys are not supported in the CLI.
+func finishSecondStep(ctx context.Context, client *http.Client, api string, raw json.RawMessage) (loginResult, error) {
+	var step struct {
+		Token   string   `json:"token"`
+		Methods []string `json:"methods"`
+	}
+	if err := json.Unmarshal(raw, &step); err != nil {
+		return loginResult{}, fmt.Errorf("second step: %w", err)
+	}
+	code, err := secondStepCode(step.Methods)
+	if err != nil {
+		return loginResult{}, err
+	}
+	var out loginResult
+	if err := doJSON(ctx, client, http.MethodPost, api+"/api/v1/auth/login/code", map[string]string{
+		"token": step.Token, "code": code,
+	}, "", &out); err != nil {
+		return loginResult{}, fmt.Errorf("second step: %w", err)
+	}
+	return out, nil
+}
+
+func secondStepCode(methods []string) (string, error) {
+	if code := strings.TrimSpace(os.Getenv("DAYRULE_TOTP_CODE")); code != "" {
+		return code, nil
+	}
+	if code := strings.TrimSpace(os.Getenv("DAYRULE_BACKUP_CODE")); code != "" {
+		return code, nil
+	}
+	if secret := strings.TrimSpace(os.Getenv("DAYRULE_TOTP_SECRET")); secret != "" {
+		raw, err := base32.StdEncoding.WithPadding(base32.NoPadding).DecodeString(
+			strings.ToUpper(strings.ReplaceAll(secret, " ", "")))
+		if err != nil {
+			return "", fmt.Errorf("DAYRULE_TOTP_SECRET: %w", err)
+		}
+		return auth.TOTPCode(raw, auth.TOTPStep(time.Now())), nil
+	}
+	hasCode := false
+	for _, m := range methods {
+		if m == "totp" || m == "backup" {
+			hasCode = true
+			break
+		}
+	}
+	if !hasCode {
+		return "", fmt.Errorf("account has two-step sign-in with passkey only; the CLI cannot assert a passkey — use an authenticator app (DAYRULE_TOTP_SECRET or DAYRULE_TOTP_CODE) or a backup code (DAYRULE_BACKUP_CODE), or turn two-step off for this agent account")
+	}
+	return "", fmt.Errorf("account has two-step sign-in; set DAYRULE_TOTP_SECRET (base32), DAYRULE_TOTP_CODE, or DAYRULE_BACKUP_CODE")
 }
 
 // Close wipes key material.
