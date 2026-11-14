@@ -58,7 +58,12 @@ func run(logger *slog.Logger) error {
 		cfg.Sync = &httpapi.Sync{
 			Accounts:   accounts,
 			Store:      store.Records{Accounts: accounts.Store},
+			Errors:     store.ErrorReports{Pool: pool},
 			CronSecret: os.Getenv("CRON_SECRET"),
+		}
+		cfg.Errors = &httpapi.Errors{
+			Accounts: accounts,
+			Store:    store.ErrorReports{Pool: pool},
 		}
 		cfg.Reminders = &httpapi.Reminders{
 			Accounts:   accounts,
