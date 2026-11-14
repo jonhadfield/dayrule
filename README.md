@@ -72,3 +72,5 @@ Agent and contributor conventions: [`AGENTS.md`](AGENTS.md).
 
 Source is published for transparency and companion development. Dayrule the
 product remains invite-only at [dayrule.app](https://dayrule.app).
+
+> _Temporary CodeRabbit smoke-test PR — safe to close._
