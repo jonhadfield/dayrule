@@ -31,6 +31,8 @@ type Config struct {
 	Sync *Sync
 	// Reminders serves reminders and push; nil without a database.
 	Reminders *Reminders
+	// Errors serves client error reports; nil without a database.
+	Errors *Errors
 }
 
 // NewHandler returns the API's root handler.
@@ -45,6 +47,9 @@ func NewHandler(cfg Config) http.Handler {
 	}
 	if cfg.Reminders != nil {
 		cfg.Reminders.routes(mux)
+	}
+	if cfg.Errors != nil {
+		cfg.Errors.routes(mux)
 	}
 
 	return recoverer(cfg.Logger, requestLogger(cfg.Logger, requireClientHeader(requireMinNativeBuild(cfg, mux))))

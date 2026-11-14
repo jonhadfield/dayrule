@@ -2,7 +2,8 @@
 // (stdio) that manage to-dos via the same encrypted sync API as the apps.
 //
 // Auth: DAYRULE_EMAIL + DAYRULE_PASSWORD (optional DAYRULE_API, default
-// https://dayrule.app). Two-step sign-in is not supported yet.
+// https://dayrule.app). Two-step: DAYRULE_TOTP_SECRET, DAYRULE_TOTP_CODE,
+// or DAYRULE_BACKUP_CODE (passkeys are not supported in the CLI).
 //
 //	go run ./cmd/dayrule inbox
 //	go run ./cmd/dayrule today

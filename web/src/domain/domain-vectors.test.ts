@@ -208,6 +208,75 @@ function build() {
       ],
       latestStamp: [{ entity: tombEntity, result: latestStamp(tombEntity) }],
     },
+    // PLAN §16.1: multi-device merge traces (fixed stamps). Fold `versions`
+    // in each `foldOrders` index sequence; every order must equal `result`.
+    // Optional `tombstone` applies resolveTombstone to the folded entity.
+    mergeTraces: (() => {
+      const fold = (vs: MergeE[]) =>
+        vs.reduce<MergeE | undefined>(
+          (acc, v) => mergeEntity(acc, v),
+          undefined,
+        )!
+
+      const aTitle: MergeE = {
+        id: 'todo-1',
+        title: 'Milk',
+        clock: { id: '1', title: '0000001-000-a' },
+      }
+      const bNotes: MergeE = {
+        id: 'todo-1',
+        notes: '2 litres',
+        clock: { id: '1', notes: '0000002-000-b' },
+      }
+      const aTitle2: MergeE = {
+        id: 'todo-1',
+        title: 'Oat milk',
+        clock: { id: '1', title: '0000003-000-a' },
+      }
+      const concurrent = [aTitle, bNotes, aTitle2]
+
+      const older: MergeE = {
+        id: 'todo-2',
+        title: 'Old',
+        clock: { id: '1', title: '0000004-000-a' },
+      }
+      const laterEdit: MergeE = {
+        id: 'todo-2',
+        title: 'Keep me',
+        clock: { id: '1', title: '0000008-000-b' },
+      }
+
+      return [
+        {
+          name: 'concurrent-title-and-notes',
+          versions: concurrent,
+          foldOrders: [
+            [0, 1, 2],
+            [2, 0, 1],
+            [1, 2, 0],
+            [2, 1, 0],
+          ],
+          result: fold(concurrent),
+        },
+        {
+          name: 'tombstone-loses-to-later-edit',
+          versions: [older, laterEdit],
+          foldOrders: [
+            [0, 1],
+            [1, 0],
+          ],
+          tombstone: '0000005-000-a',
+          result: resolveTombstone(fold([older, laterEdit]), '0000005-000-a'),
+        },
+        {
+          name: 'tombstone-wins-over-older-entity',
+          versions: [older],
+          foldOrders: [[0]],
+          tombstone: '0000009-000-a',
+          result: resolveTombstone(older, '0000009-000-a'),
+        },
+      ]
+    })(),
     // PLAN §16.1: project headings + inherited tags (fixed ids).
     organisation: (() => {
       const w = new World()
@@ -333,8 +402,7 @@ function build() {
       }
     })(),
     // PLAN §16.1: Quick Find known answers (fixed ids). Native rebuilds the
-    // same seed and asserts search / homeOf. Merge-trace fixtures still to
-    // expand later.
+    // same seed and asserts search / homeOf.
     find: (() => {
       const w = new World()
       const project = w.project({ id: 'proj-garden', title: 'Garden shed' })
