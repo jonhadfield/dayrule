@@ -71,4 +71,5 @@ Agent and contributor conventions: [`AGENTS.md`](AGENTS.md).
 ## Licence
 
 Source is published for transparency and companion development. Dayrule the
-product remains invite-only at [dayrule.app](https://dayrule.app).
+product remains invite-only at [dayrule.app](https://dayrule.app); the privacy
+notice, terms and open signup wait for a later product launch.

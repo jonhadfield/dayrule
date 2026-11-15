@@ -1,8 +1,13 @@
+import { useEffect } from 'react'
 import type { ErrorComponentProps } from '@tanstack/react-router'
+import { reportError } from './errors'
 
 /** Shown instead of a blank page if rendering fails. Data is safe on the device. */
 export function AppError({ error, reset }: ErrorComponentProps) {
-  console.error(error)
+  useEffect(() => {
+    console.error(error)
+    reportError(error)
+  }, [error])
   return (
     <div className="mx-auto max-w-md p-8">
       <h1 className="mb-2 font-serif text-2xl font-semibold">
