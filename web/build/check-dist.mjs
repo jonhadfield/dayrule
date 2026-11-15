@@ -1,5 +1,5 @@
 // After a build (PLAN.md §10.7):
-// - every script and stylesheet in dist/index.html carries an integrity hash
+// - every script and stylesheet in each dist/*.html carries an integrity hash
 //   that matches the file on disk;
 // - every other script in dist/assets (the crypto worker) has its hash
 //   written into a script that is itself covered, so nothing runs unchecked.
@@ -11,22 +11,32 @@ const sha384 = (file) =>
     .update(readFileSync(`dist/${file}`))
     .digest('base64')
 
-const html = readFileSync('dist/index.html', 'utf8')
-const tags = [...html.matchAll(/<(script|link)\b[^>]*>/g)].map((m) => m[0])
-const assets = tags.filter((t) => /(src|href)="\/assets\//.test(t))
+const pages = readdirSync('dist').filter((f) => f.endsWith('.html'))
+if (pages.length === 0) {
+  console.error('No HTML pages found in dist/')
+  process.exit(1)
+}
+
 const covered = new Set()
 let bad = 0
-for (const tag of assets) {
-  const file = tag.match(/(?:src|href)="\/(assets\/[^"]+)"/)[1]
-  const integrity = tag.match(/integrity="sha384-([^"]+)"/)?.[1]
-  if (integrity !== sha384(file)) {
-    console.error(`SRI mismatch or missing: ${file}`)
+let tagCount = 0
+for (const page of pages) {
+  const html = readFileSync(`dist/${page}`, 'utf8')
+  const tags = [...html.matchAll(/<(script|link)\b[^>]*>/g)].map((m) => m[0])
+  const assets = tags.filter((t) => /(src|href)="\/assets\//.test(t))
+  if (assets.length === 0) {
+    console.error(`No asset tags found in dist/${page}`)
     bad++
-  } else covered.add(file)
-}
-if (assets.length === 0) {
-  console.error('No asset tags found in dist/index.html')
-  bad++
+  }
+  for (const tag of assets) {
+    tagCount++
+    const file = tag.match(/(?:src|href)="\/(assets\/[^"]+)"/)[1]
+    const integrity = tag.match(/integrity="sha384-([^"]+)"/)?.[1]
+    if (integrity !== sha384(file)) {
+      console.error(`SRI mismatch or missing: ${file} (from ${page})`)
+      bad++
+    } else covered.add(file)
+  }
 }
 
 const coveredScripts = [...covered]
@@ -50,4 +60,6 @@ if (
 }
 
 if (bad) process.exit(1)
-console.log(`SRI ok: ${assets.length} tags, ${embedded} embedded hash`)
+console.log(
+  `SRI ok: ${pages.length} pages, ${tagCount} tags, ${embedded} embedded hash`,
+)

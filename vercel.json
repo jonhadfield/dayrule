@@ -9,6 +9,22 @@
       "outputDirectory": "dist",
       "rewrites": [
         {
+          "source": "/help",
+          "destination": "/help.html"
+        },
+        {
+          "source": "/help/:path*",
+          "destination": "/help.html"
+        },
+        {
+          "source": "/privacy",
+          "destination": "/legal.html"
+        },
+        {
+          "source": "/terms",
+          "destination": "/legal.html"
+        },
+        {
           "source": "/((?!\\.well-known/|robots\\.txt$|sitemap\\.xml$).*)",
           "destination": "/index.html"
         }
