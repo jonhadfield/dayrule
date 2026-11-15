@@ -1,11 +1,7 @@
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
-import App from './App.tsx'
-import { Gate } from './account/Gate'
-import { LegalPage } from './features/legal/LegalPage'
 import { isHelpPath, LEGAL_PATHS } from './features/legal/paths'
-import { HelpPage } from './features/help/HelpPage'
 import { registerServiceWorker } from './app/pwa'
 import { installErrorReporting } from './app/errors'
 import { UpdateBanner } from './app/UpdateBanner'
@@ -17,17 +13,26 @@ installErrorReporting()
 
 const path = location.pathname
 
+// Path-split so help/legal don't ship in the app's initial JS (decision 24).
+const HelpPage = lazy(() =>
+  import('./features/help/HelpPage').then((m) => ({ default: m.HelpPage })),
+)
+const LegalPage = lazy(() =>
+  import('./features/legal/LegalPage').then((m) => ({ default: m.LegalPage })),
+)
+const AppRoot = lazy(() => import('./AppRoot'))
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    {isHelpPath(path) ? (
-      <HelpPage path={path} />
-    ) : LEGAL_PATHS.includes(path) ? (
-      <LegalPage path={path} />
-    ) : (
-      <Gate>
-        <App />
-      </Gate>
-    )}
+    <Suspense fallback={null}>
+      {isHelpPath(path) ? (
+        <HelpPage path={path} />
+      ) : LEGAL_PATHS.includes(path) ? (
+        <LegalPage path={path} />
+      ) : (
+        <AppRoot />
+      )}
+    </Suspense>
     <UpdateBanner />
   </StrictMode>,
 )

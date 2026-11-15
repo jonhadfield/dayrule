@@ -7,6 +7,8 @@ import (
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/jonhadfield/dayrule/server/internal/store"
 )
 
 func TestErrorReport(t *testing.T) {
@@ -24,12 +26,20 @@ func TestErrorReport(t *testing.T) {
 	})
 	wantCode(t, "accepted", r, 204, "")
 
+	recent, err := (store.ErrorReports{Pool: hs.store.Pool}).Recent(context.Background(), 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(recent) < 1 || recent[0].Message != "boom" || recent[0].Release != "build-test" {
+		t.Fatalf("Recent: %#v", recent)
+	}
+
 	long := strings.Repeat("x", maxErrorMessage+50)
 	wantCode(t, "long message clipped", c.do("POST", "/api/v1/errors", map[string]string{
 		"message": long,
 	}), 204, "")
 
-	_, err := hs.store.Pool.Exec(context.Background(),
+	_, err = hs.store.Pool.Exec(context.Background(),
 		`UPDATE error_reports SET created_at = $1`, hs.now.Add(-40*24*time.Hour))
 	if err != nil {
 		t.Fatal(err)

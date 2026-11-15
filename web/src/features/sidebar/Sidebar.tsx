@@ -17,7 +17,7 @@ import { Progress } from '../../ui/Progress'
 import { SyncStatus } from './SyncStatus'
 import { APP_VERSION } from '../../app/pwa'
 import { lock, signOut, useAccount } from '../../account/session'
-import { AccountDialog } from '../../account/AccountDialog'
+import { LazyAccountDialog } from '../../account/LazyAccountDialog'
 import { DropTarget } from '../dnd/DropTarget'
 import type { DropAction } from '../dnd/types'
 import type { ListKey } from '../../ui/lists'
@@ -274,7 +274,7 @@ export function Sidebar() {
           </div>
         </Popover>
       </div>
-      <AccountDialog open={accountOpen} onOpenChange={setAccountOpen} />
+      <LazyAccountDialog open={accountOpen} onOpenChange={setAccountOpen} />
     </nav>
   )
 }

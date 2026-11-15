@@ -1,6 +1,6 @@
 import { Dialog } from 'radix-ui'
 import { useState } from 'react'
-import { AccountDialog } from './AccountDialog'
+import { LazyAccountDialog } from './LazyAccountDialog'
 import { dismissTwoStepSuggestion, useAccount } from './session'
 
 /**
@@ -47,7 +47,7 @@ export function TwoStepPrompt() {
           </Dialog.Content>
         </Dialog.Portal>
       </Dialog.Root>
-      <AccountDialog
+      <LazyAccountDialog
         open={account}
         onOpenChange={setAccount}
         focus="two-step"
