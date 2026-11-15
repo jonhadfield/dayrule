@@ -7,11 +7,13 @@ import { LegalPage } from './features/legal/LegalPage'
 import { isHelpPath, LEGAL_PATHS } from './features/legal/paths'
 import { HelpPage } from './features/help/HelpPage'
 import { registerServiceWorker } from './app/pwa'
+import { installErrorReporting } from './app/errors'
 import { UpdateBanner } from './app/UpdateBanner'
 import { applyTheme, storedTheme } from './app/theme'
 
 applyTheme(storedTheme())
 registerServiceWorker()
+installErrorReporting()
 
 const path = location.pathname
 
