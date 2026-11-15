@@ -5,7 +5,7 @@ export function Privacy() {
     <article>
       <H1>Privacy</H1>
       <p className="mb-6 text-sm text-text-secondary">
-        Last updated 17 October 2026
+        Last updated 15 November 2026
       </p>
 
       <P>
@@ -62,6 +62,12 @@ export function Privacy() {
           each reminder is due, never what it’s for. If you choose
           notifications, the address your browser gives us for sending them.
         </li>
+        <li>
+          <strong>Crash reports</strong> — if the web app hits an uncaught
+          error, your browser may send a short message, stack trace, build id
+          and user-agent so we can fix bugs. These never include your to-dos or
+          other decrypted content.
+        </li>
       </List>
       <P>
         We use this to provide the service you’ve asked for (the contract
@@ -111,6 +117,7 @@ export function Privacy() {
           Records of deleted items, kept so your devices stay in step: 90 days,
           encrypted.
         </li>
+        <li>Crash reports: 30 days, then deleted automatically.</li>
       </List>
 
       <H2>Cookies and storage on your device</H2>

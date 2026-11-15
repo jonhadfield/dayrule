@@ -115,6 +115,24 @@ describe('security headers', () => {
     expect(spa?.source).toContain('sitemap\\.xml$')
   })
 
+  it('serves help and legal as their own HTML entries', () => {
+    const rewrites = (
+      vercel as {
+        services: {
+          web: { rewrites: { source: string; destination: string }[] }
+        }
+      }
+    ).services.web.rewrites
+    expect(rewrites).toEqual(
+      expect.arrayContaining([
+        { source: '/help', destination: '/help.html' },
+        { source: '/help/:path*', destination: '/help.html' },
+        { source: '/privacy', destination: '/legal.html' },
+        { source: '/terms', destination: '/legal.html' },
+      ]),
+    )
+  })
+
   it('serves apple-app-site-association as JSON (native webcredentials)', () => {
     const rule = vercel.headers.find(
       (r) => r.source === '/.well-known/apple-app-site-association',

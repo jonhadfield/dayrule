@@ -45,6 +45,8 @@ From `server/`:
 - `go run ./cmd/migrate status|up|down` — needs `DATABASE_URL_UNPOOLED`.
 - `go run ./cmd/invite [n]` — prints n single-use invite codes; needs only
   that environment's `DATABASE_URL_UNPOOLED` (invites are stored as SHA-256).
+- `go run ./cmd/error-reports [n]` — lists the newest n client crash reports
+  (message/stack only; decision 10). Needs `DATABASE_URL_UNPOOLED`.
 - `go run ./cmd/plaintext-check needle…` — lists the `table.column`s where
   any needle appears (also inside base64); used by `web/e2e/no-plaintext.e2e.ts`.
   Needs `DATABASE_URL_UNPOOLED`.
