@@ -11,10 +11,7 @@ export function CalendarEventRows({ events }: { events: CalendarEvent[] }) {
           key={ev.uid}
           className="flex min-h-[var(--row-height)] items-center gap-2 border-b border-hairline px-1 text-[15px] text-text-secondary"
         >
-          <span
-            className="w-10 shrink-0 text-xs tabular-nums"
-            title="Calendar"
-          >
+          <span className="w-10 shrink-0 text-xs tabular-nums" title="Calendar">
             {ev.time ?? 'all day'}
           </span>
           <span className="min-w-0 flex-1 truncate text-text">{ev.title}</span>
