@@ -3,7 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 import { createHash } from 'node:crypto'
 import { readFileSync } from 'node:fs'
-import type { Plugin } from 'vite'
+import { resolve } from 'node:path'
+import type { Connect, Plugin } from 'vite'
 import { defineConfig } from 'vitest/config'
 
 // Production and every preview are separate origins, so separate installed
@@ -51,32 +52,52 @@ function sri(): Plugin {
           user.code = user.code.replaceAll(placeholder, hash)
         }
 
-        const page = bundle['index.html']
-        if (!page || page.type !== 'asset') return
-        page.source = String(page.source).replace(
-          /<(script|link)\b([^>]*?)\s(src|href)="\/(assets\/[^"]+)"([^>]*)>/g,
-          (
-            tag,
-            name: string,
-            before: string,
-            attr: string,
-            file: string,
-            after: string,
-          ) => {
-            if (/integrity=/.test(tag)) return tag
-            if (
-              name === 'link' &&
-              !/rel="(stylesheet|modulepreload)"/.test(tag)
-            )
-              return tag
-            const out = bundle[file]
-            if (!out) throw new Error(`SRI: ${file} is not in the bundle`)
-            const content = out.type === 'chunk' ? out.code : out.source
-            const hash = createHash('sha384').update(content).digest('base64')
-            return `<${name}${before} ${attr}="/${file}" integrity="sha384-${hash}"${after}>`
-          },
-        )
+        for (const [fileName, page] of Object.entries(bundle)) {
+          if (!fileName.endsWith('.html') || page.type !== 'asset') continue
+          page.source = String(page.source).replace(
+            /<(script|link)\b([^>]*?)\s(src|href)="\/(assets\/[^"]+)"([^>]*)>/g,
+            (
+              tag,
+              name: string,
+              before: string,
+              attr: string,
+              file: string,
+              after: string,
+            ) => {
+              if (/integrity=/.test(tag)) return tag
+              if (
+                name === 'link' &&
+                !/rel="(stylesheet|modulepreload)"/.test(tag)
+              )
+                return tag
+              const out = bundle[file]
+              if (!out) throw new Error(`SRI: ${file} is not in the bundle`)
+              const content = out.type === 'chunk' ? out.code : out.source
+              const hash = createHash('sha384').update(content).digest('base64')
+              return `<${name}${before} ${attr}="/${file}" integrity="sha384-${hash}"${after}>`
+            },
+          )
+        }
       },
+    },
+  }
+}
+
+/** Serve help.html / legal.html for public paths (dev + vite preview). */
+function publicPageFallback(): Plugin {
+  const rewrite: Connect.NextHandleFunction = (req, _res, next) => {
+    const path = req.url?.split('?')[0] ?? ''
+    if (path === '/help' || path.startsWith('/help/')) req.url = '/help.html'
+    else if (path === '/privacy' || path === '/terms') req.url = '/legal.html'
+    next()
+  }
+  return {
+    name: 'dayrule-public-pages',
+    configureServer(server) {
+      server.middlewares.use(rewrite)
+    },
+    configurePreviewServer(server) {
+      server.middlewares.use(rewrite)
     },
   }
 }
@@ -104,10 +125,22 @@ function productionHeaders(): Record<string, string> {
 // https://vite.dev/config/
 export default defineConfig({
   preview: { headers: productionHeaders() },
+  // Help and legal are separate entries so their copy stays out of the app’s
+  // initial JS (decision 24) while every script remains SRI-covered (§10.7).
+  build: {
+    rollupOptions: {
+      input: {
+        main: resolve(import.meta.dirname, 'index.html'),
+        help: resolve(import.meta.dirname, 'help.html'),
+        legal: resolve(import.meta.dirname, 'legal.html'),
+      },
+    },
+  },
   plugins: [
     react(),
     tailwindcss(),
     sri(),
+    publicPageFallback(),
     {
       name: 'dayrule-icons',
       transformIndexHtml: (html) => html.replaceAll('%ICON%', icon),

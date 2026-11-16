@@ -123,14 +123,24 @@ for (const kind of ['cold', 'warm']) {
   console.log(formatLine(ok, kind, m, limit))
 }
 
-// Initial JS, gzipped: a warning, not a limit (decision 24).
+// Initial JS, gzipped: a warning, not a limit (decision 24). Sum every
+// script / modulepreload on the app page (help/legal are separate entries).
 const html = readFileSync('dist/index.html', 'utf8')
-const entry = html.match(/<script[^>]+src="\/(assets\/[^"]+\.js)"/)?.[1]
-const kb = Math.round(gzipSync(readFileSync(`dist/${entry}`)).length / 1024)
+const initialJs = [
+  ...html.matchAll(/(?:src|href)="\/(assets\/[^"]+\.js)"/g),
+].map((m) => m[1])
+const kb = Math.round(
+  initialJs.reduce(
+    (n, file) => n + gzipSync(readFileSync(`dist/${file}`)).length,
+    0,
+  ) / 1024,
+)
 const chunks = readdirSync('dist/assets').filter((f) =>
   f.endsWith('.js'),
 ).length
-console.log(`initial JS: ${kb} KB gzipped (${chunks} JS files in total)`)
+console.log(
+  `initial JS: ${kb} KB gzipped (${initialJs.length} on index.html, ${chunks} JS files in total)`,
+)
 if (kb > BUNDLE_WARN_KB) {
   console.log(
     `::warning title=Bundle size::Initial JS is ${kb} KB gzipped, over the ${BUNDLE_WARN_KB} KB guideline`,
