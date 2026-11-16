@@ -47,6 +47,7 @@ import {
   type TwoStepStatus,
 } from './twostep'
 import { QrCode } from './QrCode'
+import { useCalendarOverlay } from '../calendar/overlay'
 import { deviceLabel } from './api'
 import { ErrorText, Field } from './ui'
 import { message, newPasswordProblem } from './validation'
@@ -162,6 +163,7 @@ function AccountSettings({ focus }: { focus?: 'two-step' }) {
       <TwoStepSection />
       <DevicesSection remember={profile.remember} />
       <RemindersSection />
+      <CalendarSection />
       <DataSection />
       <DeleteSection />
     </>
@@ -955,6 +957,75 @@ function DataSection() {
             }}
           />
         </label>
+      </div>
+    </Section>
+  )
+}
+
+/** Calendar overlay (§8.3): local .ics import only (no URL fetch yet). */
+function CalendarSection() {
+  const events = useCalendarOverlay((s) => s.events)
+  const sourceName = useCalendarOverlay((s) => s.sourceName)
+  const setFromIcs = useCalendarOverlay((s) => s.setFromIcs)
+  const clear = useCalendarOverlay((s) => s.clear)
+  const [done, setDone] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  return (
+    <Section title="Calendar">
+      <p className="mb-3 text-sm text-text-secondary">
+        Import an <code className="text-xs">.ics</code> file to show events on
+        Today and Scheduled. Parsing stays in this browser; events are not
+        synced and clear when you lock. Fetching a calendar URL (and any CORS
+        proxy) is not enabled yet — a proxy would see the feed URL.
+      </p>
+      <Done text={done} />
+      <ErrorText error={error} />
+      {events.length > 0 && (
+        <p className="mb-3 text-sm">
+          {events.length} event{events.length === 1 ? '' : 's'}
+          {sourceName ? ` from ${sourceName}` : ''}.
+        </p>
+      )}
+      <div className="flex flex-wrap gap-2">
+        <label className={`${button} cursor-pointer`}>
+          Import .ics…
+          <input
+            type="file"
+            accept=".ics,text/calendar"
+            className="sr-only"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              e.target.value = ''
+              if (!file) return
+              setError(null)
+              setDone(null)
+              void file
+                .text()
+                .then((text) => {
+                  const n = setFromIcs(text, file.name)
+                  setDone(
+                    n === 0
+                      ? 'No events found in that file.'
+                      : `Showing ${n} event${n === 1 ? '' : 's'} on Today and Scheduled.`,
+                  )
+                })
+                .catch(() => setError('That file couldn’t be read.'))
+            }}
+          />
+        </label>
+        {events.length > 0 && (
+          <button
+            type="button"
+            className={button}
+            onClick={() => {
+              clear()
+              setDone('Calendar overlay cleared.')
+            }}
+          >
+            Clear
+          </button>
+        )}
       </div>
     </Section>
   )

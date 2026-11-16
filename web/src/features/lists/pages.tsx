@@ -5,15 +5,17 @@ import {
   useEntityStore,
   useListContext,
 } from '../../app/context'
-import { fromLocalDate } from '../../domain/dates'
+import { addLocalDays, fromLocalDate } from '../../domain/dates'
 import * as lists from '../../domain/lists'
 import { filterByTag } from '../../domain/lists'
 import * as cmd from '../../store/commands'
 import { listMeta, NOT_NOW, type ListKey } from '../../ui/lists'
 import { ItemList } from '../todo/ItemList'
 import type { Group } from '../dnd/types'
+import { ScheduledCalendarEvents, TodayCalendarEvents } from './CalendarEvents'
 import { ListShell, SectionHeading, TagFilterBar } from './ListShell'
 import { VirtualDoneList } from './VirtualDoneList'
+import { useCalendarOverlay } from '../../calendar/overlay'
 
 function header(list: ListKey) {
   const meta = listMeta(list)
@@ -72,15 +74,18 @@ export function TodayPage() {
   const ctx = useListContext()
   const [tag, setTag] = useTagFilter()
   const all = lists.today(e, ctx)
+  const calEvents = useCalendarOverlay((s) => s.events)
+  const calCount = calEvents.filter((ev) => ev.date === ctx.today).length
   const h = header('today')
   return (
     <ListShell
       {...h}
       newTodo={{ placement: { list: 'today' } }}
       orderField="todayOrder"
-      empty={all.length === 0}
+      empty={all.length === 0 && calCount === 0}
       emptyIcon={h.icon}
     >
+      <TodayCalendarEvents today={ctx.today} />
       <TagFilterBar items={all} selected={tag} onSelect={setTag} />
       <ItemList
         items={filterByTag(e, all, tag)}
@@ -102,8 +107,23 @@ export function ScheduledPage() {
   const e = useAllEntities()
   const ctx = useListContext()
   const u = lists.scheduled(e, ctx)
+  const allCal = useCalendarOverlay((s) => s.events)
+  const calEvents = allCal.filter((ev) => ev.date > ctx.today)
   const h = header('scheduled')
   const tomorrow = u.days[0]?.date
+  const tomorrowLabel = addLocalDays(ctx.today, 1)
+  // Days that have calendar events but no scheduled to-dos yet.
+  const todoDates = new Set(u.days.map((d) => d.date))
+  const calOnlyDays = [
+    ...new Set(calEvents.map((ev) => ev.date).filter((d) => !todoDates.has(d))),
+  ].sort()
+  const daySections = [
+    ...u.days.map((day) => ({ date: day.date, items: day.items })),
+    ...calOnlyDays.map((date) => ({
+      date,
+      items: [] as (typeof u.days)[0]['items'],
+    })),
+  ].sort((a, b) => a.date.localeCompare(b.date))
   return (
     <ListShell
       {...h}
@@ -116,16 +136,17 @@ export function ScheduledPage() {
           : undefined
       }
     >
-      {u.days.map((day, i) => (
+      {daySections.map((day) => (
         <section key={day.date}>
           <SectionHeading color="text-text">
             <span className="text-[17px] font-bold">
               {fromLocalDate(day.date).getDate()}
             </span>{' '}
             <span className="text-text-secondary">
-              {i === 0 ? 'Tomorrow' : weekday(day.date)}
+              {day.date === tomorrowLabel ? 'Tomorrow' : weekday(day.date)}
             </span>
           </SectionHeading>
+          <ScheduledCalendarEvents date={day.date} />
           <ItemList
             items={day.items}
             ctx={ctx}
