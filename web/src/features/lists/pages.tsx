@@ -74,9 +74,8 @@ export function TodayPage() {
   const ctx = useListContext()
   const [tag, setTag] = useTagFilter()
   const all = lists.today(e, ctx)
-  const calCount = useCalendarOverlay(
-    (s) => s.events.filter((ev) => ev.date === ctx.today).length,
-  )
+  const calEvents = useCalendarOverlay((s) => s.events)
+  const calCount = calEvents.filter((ev) => ev.date === ctx.today).length
   const h = header('today')
   return (
     <ListShell
@@ -108,9 +107,8 @@ export function ScheduledPage() {
   const e = useAllEntities()
   const ctx = useListContext()
   const u = lists.scheduled(e, ctx)
-  const calEvents = useCalendarOverlay((s) =>
-    s.events.filter((ev) => ev.date > ctx.today),
-  )
+  const allCal = useCalendarOverlay((s) => s.events)
+  const calEvents = allCal.filter((ev) => ev.date > ctx.today)
   const h = header('scheduled')
   const tomorrow = u.days[0]?.date
   const tomorrowLabel = addLocalDays(ctx.today, 1)

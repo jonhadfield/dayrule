@@ -11,7 +11,10 @@ export function CalendarEventRows({ events }: { events: CalendarEvent[] }) {
           key={ev.uid}
           className="flex min-h-[var(--row-height)] items-center gap-2 border-b border-hairline px-1 text-[15px] text-text-secondary"
         >
-          <span className="w-10 shrink-0 text-xs tabular-nums" title="Calendar">
+          <span
+            className="w-10 shrink-0 text-xs tabular-nums"
+            title="Calendar"
+          >
             {ev.time ?? 'all day'}
           </span>
           <span className="min-w-0 flex-1 truncate text-text">{ev.title}</span>
@@ -22,15 +25,13 @@ export function CalendarEventRows({ events }: { events: CalendarEvent[] }) {
 }
 
 export function TodayCalendarEvents({ today }: { today: string }) {
-  const events = useCalendarOverlay((s) =>
-    s.events.filter((e) => e.date === today),
-  )
-  return <CalendarEventRows events={events} />
+  // Select the stable array; filter in render so Zustand doesn’t see a new
+  // reference every time (which re-renders forever).
+  const all = useCalendarOverlay((s) => s.events)
+  return <CalendarEventRows events={all.filter((e) => e.date === today)} />
 }
 
 export function ScheduledCalendarEvents({ date }: { date: string }) {
-  const events = useCalendarOverlay((s) =>
-    s.events.filter((e) => e.date === date),
-  )
-  return <CalendarEventRows events={events} />
+  const all = useCalendarOverlay((s) => s.events)
+  return <CalendarEventRows events={all.filter((e) => e.date === date)} />
 }
