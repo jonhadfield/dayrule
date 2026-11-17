@@ -135,7 +135,7 @@ export function Layout() {
       <div className="flex h-full flex-col">
         <SignInToSync />
         <div className="flex min-h-0 flex-1">
-          <aside className="w-[260px] shrink-0 border-r border-hairline bg-sidebar">
+          <aside className="w-[var(--sidebar-width)] shrink-0 border-r border-hairline bg-sidebar">
             <Sidebar />
           </aside>
           <main className="min-w-0 flex-1 overflow-y-auto">

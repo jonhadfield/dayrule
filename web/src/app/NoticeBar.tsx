@@ -10,7 +10,7 @@ export function NoticeBar() {
       role="status"
       aria-live="polite"
       aria-label={notice.message}
-      className="notice-in pointer-events-none fixed inset-x-3 z-40 mx-auto flex max-w-md justify-center md:left-[272px]"
+      className="notice-in pointer-events-none fixed inset-x-3 z-40 mx-auto flex max-w-md justify-center md:left-[calc(var(--sidebar-width)+12px)]"
       style={{
         bottom: 'max(calc(env(safe-area-inset-bottom) + 4.75rem), 5.5rem)',
       }}

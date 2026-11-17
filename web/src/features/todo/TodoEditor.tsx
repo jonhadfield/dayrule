@@ -18,6 +18,7 @@ import { compareKeys } from '../../domain/order'
 import type { Todo } from '../../domain/types'
 import * as cmd from '../../store/commands'
 import { Checkbox } from '../../ui/Checkbox'
+import { RowLeading } from '../../ui/RowLeading'
 import { DeadlinePicker } from '../pickers/DeadlinePicker'
 import { MovePicker } from '../pickers/MovePicker'
 import { TagPicker } from '../pickers/TagPicker'
@@ -115,22 +116,24 @@ export function TodoEditor({
           </button>
         </div>
       )}
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-[var(--row-glyph-spacing)]">
         <div className="pt-1">
-          <Checkbox
-            status={todo.status}
-            label="Complete"
-            onToggle={() =>
-              store.run('Complete', (d, env) =>
-                cmd.setStatus(
-                  d,
-                  env,
-                  [todo.id],
-                  todo.status === 'open' ? 'completed' : 'open',
-                ),
-              )
-            }
-          />
+          <RowLeading>
+            <Checkbox
+              status={todo.status}
+              label="Complete"
+              onToggle={() =>
+                store.run('Complete', (d, env) =>
+                  cmd.setStatus(
+                    d,
+                    env,
+                    [todo.id],
+                    todo.status === 'open' ? 'completed' : 'open',
+                  ),
+                )
+              }
+            />
+          </RowLeading>
         </div>
         <div className="min-w-0 flex-1">
           <input
