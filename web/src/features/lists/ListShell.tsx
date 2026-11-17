@@ -7,6 +7,7 @@ import { effectiveTagIds, type Item } from '../../domain/lists'
 import { compareKeys } from '../../domain/order'
 import type { OrderField, Placement, When } from '../../store/commands'
 import { useUI } from '../../app/ui-state'
+import { RowLeading } from '../../ui/RowLeading'
 import { useSelectionBarShown } from '../todo/selection'
 import { startNewTodo } from '../todo/editing'
 
@@ -55,7 +56,7 @@ export function ListShell({
     })
   }, [placementKey, orderField, projectId])
   return (
-    <div className="list-in relative mx-auto w-full max-w-[720px] px-4 pt-4 pb-28 md:px-8 md:pt-10">
+    <div className="list-in relative mx-auto w-full max-w-[var(--reading-max-width)] px-[var(--list-chrome-inset)] pt-4 pb-28 md:pt-10">
       {!isDesktop && (
         <Link
           to="/"
@@ -64,8 +65,8 @@ export function ListShell({
           <ChevronLeft size={20} /> Lists
         </Link>
       )}
-      <header className="mb-4 flex items-center gap-3 border-b-2 border-text pb-2">
-        {icon}
+      <header className="mb-4 flex items-center gap-[var(--row-glyph-spacing)] border-b border-hairline pb-2">
+        {icon != null && <RowLeading>{icon}</RowLeading>}
         <h1 className="min-w-0 flex-1 font-serif text-[30px] font-semibold tracking-tight">
           {title}
         </h1>
@@ -160,7 +161,7 @@ function AddButton({ onAdd }: { onAdd: () => void }) {
       aria-label="Add to-do"
       title="Add to-do (N) · drag into the list to place it"
       onClick={onAdd}
-      className={`fixed bottom-[max(env(safe-area-inset-bottom),20px)] left-1/2 z-30 flex -translate-x-1/2 touch-none items-center gap-1.5 rounded-full bg-text px-5 py-2.5 font-medium text-bg shadow-md hover:bg-accent md:left-[calc(50%+130px)] ${isDragging ? 'opacity-40' : ''}`}
+      className={`fixed bottom-[max(env(safe-area-inset-bottom),20px)] left-1/2 z-30 flex -translate-x-1/2 touch-none items-center gap-1.5 rounded-full bg-text px-5 py-2.5 font-medium text-bg shadow-md hover:bg-accent md:left-[calc(50%+(var(--sidebar-width)/2))] ${isDragging ? 'opacity-40' : ''}`}
     >
       <Plus size={18} /> Add
     </button>

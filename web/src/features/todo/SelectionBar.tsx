@@ -34,7 +34,7 @@ export function SelectionBar() {
     <div
       role="toolbar"
       aria-label="Selected to-dos"
-      className="fixed inset-x-3 z-30 mx-auto flex max-w-md md:left-[272px] items-center gap-1 rounded-full bg-text px-2 py-1.5 text-bg shadow-md"
+      className="fixed inset-x-3 z-30 mx-auto flex max-w-md md:left-[calc(var(--sidebar-width)+12px)] items-center gap-1 rounded-full bg-text px-2 py-1.5 text-bg shadow-md"
       style={{ bottom: 'max(env(safe-area-inset-bottom), 16px)' }}
     >
       <Action label="Cancel selection" onClick={() => ui.stopSelecting()}>

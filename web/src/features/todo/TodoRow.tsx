@@ -15,6 +15,7 @@ import type { ListContext } from '../../domain/lists'
 import type { Todo } from '../../domain/types'
 import * as cmd from '../../store/commands'
 import { Checkbox } from '../../ui/Checkbox'
+import { RowLeading } from '../../ui/RowLeading'
 import { TodoEditor } from './TodoEditor'
 import { RowMenu } from './RowMenu'
 import { useRowSwipe } from './useRowSwipe'
@@ -124,7 +125,7 @@ export function TodoRow({
         </div>
       )}
       <div
-        className={`relative flex min-h-[var(--row-height)] items-center gap-3 bg-bg px-1 ${selected ? '' : 'hover:bg-sidebar/60'} ${swipe.dx === 0 ? 'transition-transform duration-150' : ''}`}
+        className={`relative flex min-h-[var(--row-height)] items-center gap-[var(--row-glyph-spacing)] bg-bg ${selected ? '' : 'hover:bg-sidebar/60'} ${swipe.dx === 0 ? 'transition-transform duration-150' : ''}`}
         style={
           swipe.dx ? { transform: `translateX(${swipe.dx}px)` } : undefined
         }
@@ -136,11 +137,13 @@ export function TodoRow({
             className="pointer-events-none absolute inset-0 bg-accent/10"
           />
         )}
-        <Checkbox
-          status={todo.status}
-          onToggle={toggle}
-          label={`Complete ${todo.title || 'to-do'}`}
-        />
+        <RowLeading>
+          <Checkbox
+            status={todo.status}
+            onToggle={toggle}
+            label={`Complete ${todo.title || 'to-do'}`}
+          />
+        </RowLeading>
         <div className="min-w-0 flex-1 py-1">
           <div className="flex items-center gap-2">
             {showStartDate && todo.startDate && (
