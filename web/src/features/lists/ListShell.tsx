@@ -56,7 +56,7 @@ export function ListShell({
     })
   }, [placementKey, orderField, projectId])
   return (
-    <div className="list-in relative mx-auto w-full max-w-[var(--reading-max-width)] px-[var(--list-chrome-inset)] pt-4 pb-28 md:pt-10">
+    <div className="list-in relative mx-auto w-full max-w-[var(--reading-max-width)] px-[var(--list-chrome-inset)] pt-3 pb-28 md:pt-5">
       {!isDesktop && (
         <Link
           to="/"
@@ -65,7 +65,7 @@ export function ListShell({
           <ChevronLeft size={20} /> Lists
         </Link>
       )}
-      <header className="mb-4 flex items-center gap-[var(--row-glyph-spacing)] border-b border-hairline pb-2">
+      <header className="mb-2 flex items-center gap-[var(--row-glyph-spacing)] border-b border-hairline pb-1.5">
         {icon != null && <RowLeading>{icon}</RowLeading>}
         <h1 className="min-w-0 flex-1 font-serif text-[30px] font-semibold tracking-tight">
           {title}
