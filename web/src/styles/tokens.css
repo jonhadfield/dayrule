@@ -33,7 +33,7 @@
   --row-glyph-spacing: 10px;
   /* (slot − 20px mark) / 2 — pad so circle left matches title/icon rail. */
   --list-mark-circle-leading: 4px;
-  /* Compact / phone: same as rowInset. */
+  /* Web has no AppKit list system leading — chrome shares rowInset only. */
   --list-chrome-inset: 16px;
 
   color-scheme: light;
@@ -42,8 +42,6 @@
 @media (min-width: 900px) {
   :root {
     --row-height: 36px;
-    /* Mac: rowInset + macListSystemLeading (30). */
-    --list-chrome-inset: 46px;
   }
 }
 
