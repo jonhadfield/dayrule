@@ -25,6 +25,16 @@
   --radius-popover: 8px;
 
   --row-height: 46px;
+  /* Mirrored from native Tokens.swift (Mac layout chrome). */
+  --sidebar-width: 251px;
+  --reading-max-width: 720px;
+  --row-inset: 16px;
+  --row-leading-slot: 28px;
+  --row-glyph-spacing: 10px;
+  /* (slot − 20px mark) / 2 — pad so circle left matches title/icon rail. */
+  --list-mark-circle-leading: 4px;
+  /* Compact / phone: same as rowInset. */
+  --list-chrome-inset: 16px;
 
   color-scheme: light;
 }
@@ -32,6 +42,8 @@
 @media (min-width: 900px) {
   :root {
     --row-height: 36px;
+    /* Mac: rowInset + macListSystemLeading (30). */
+    --list-chrome-inset: 46px;
   }
 }
 

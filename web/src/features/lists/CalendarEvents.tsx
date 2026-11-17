@@ -1,5 +1,6 @@
 import { useCalendarOverlay } from '../../calendar/overlay'
 import type { CalendarEvent } from '../../domain/ics'
+import { RowLeading } from '../../ui/RowLeading'
 
 /** Read-only calendar rows (not to-dos; no complete / drag). */
 export function CalendarEventRows({ events }: { events: CalendarEvent[] }) {
@@ -9,16 +10,18 @@ export function CalendarEventRows({ events }: { events: CalendarEvent[] }) {
       {events.map((ev) => (
         <li
           key={ev.uid}
-          className="flex min-h-[var(--row-height)] items-center gap-3 border-b border-hairline px-1 text-[15px]"
+          className="flex min-h-[var(--row-height)] items-center gap-[var(--row-glyph-spacing)] border-b border-hairline text-[15px]"
         >
-          {/* Same width as the to-do checkbox so titles line up. */}
-          <span
-            className="grid size-[20px] shrink-0 place-items-center text-[10px] text-text-secondary"
-            title="Calendar"
-            aria-hidden
-          >
-            ·
-          </span>
+          {/* Same leading slot as the to-do checkbox so titles line up. */}
+          <RowLeading>
+            <span
+              className="grid size-[20px] place-items-center text-[10px] text-text-secondary"
+              title="Calendar"
+              aria-hidden
+            >
+              ·
+            </span>
+          </RowLeading>
           <div className="flex min-w-0 flex-1 items-center gap-2 py-1">
             <span className="truncate text-text">{ev.title}</span>
             <span className="shrink-0 text-xs text-text-secondary">

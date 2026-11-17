@@ -325,7 +325,7 @@ export function TrashPage() {
         {[...t.areas, ...t.items].map((i) => (
           <li
             key={i.id}
-            className="flex min-h-[var(--row-height)] items-center gap-3 border-b border-hairline px-1 hover:bg-sidebar/60"
+            className="flex min-h-[var(--row-height)] items-center gap-[var(--row-glyph-spacing)] border-b border-hairline hover:bg-sidebar/60"
           >
             <span className="min-w-0 flex-1 truncate text-text-secondary">
               {i.title || 'Untitled'}
