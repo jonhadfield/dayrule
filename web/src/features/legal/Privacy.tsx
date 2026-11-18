@@ -5,7 +5,7 @@ export function Privacy() {
     <article>
       <H1>Privacy</H1>
       <p className="mb-6 text-sm text-text-secondary">
-        Last updated 15 November 2026
+        Last updated 18 November 2026
       </p>
 
       <P>
@@ -68,6 +68,14 @@ export function Privacy() {
           and user-agent so we can fix bugs. These never include your to-dos or
           other decrypted content.
         </li>
+        <li>
+          <strong>Calendar feed URL</strong>, only if you paste one in Account →
+          Calendar — we fetch that https address on your behalf so the browser
+          never talks to a third-party calendar host. We see the URL and briefly
+          the feed body (event titles and times) while returning it to your
+          browser; we don’t store the feed. A local{' '}
+          <code className="text-xs">.ics</code> file never leaves your device.
+        </li>
       </List>
       <P>
         We use this to provide the service you’ve asked for (the contract
@@ -96,6 +104,19 @@ export function Privacy() {
           <strong>Your browser’s push service</strong> (for example Apple,
           Google or Mozilla), only if you turn on notifications. It delivers a
           message containing a random id and a time.
+        </li>
+        <li>
+          <strong>Have I Been Pwned</strong> — when you choose a new password,
+          your browser checks a short hash prefix against the Pwned Passwords
+          range API so we can refuse passwords already in known breaches. That
+          request goes from your browser to{' '}
+          <code className="text-xs">api.pwnedpasswords.com</code>, not through
+          Dayrule; they see your IP and the prefix, not your account.
+        </li>
+        <li>
+          <strong>The calendar host</strong>, only if you fetch a calendar URL —
+          that server sees a request from Dayrule’s infrastructure for the feed
+          you asked for.
         </li>
       </List>
 

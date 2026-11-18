@@ -14,6 +14,7 @@ import { MobileEditor } from '../features/todo/MobileEditor'
 import { SignInToSync } from '../account/SignInAgain'
 import { SelectionBar } from '../features/todo/SelectionBar'
 import { NoticeBar } from './NoticeBar'
+import { DesktopChrome } from './DesktopChrome'
 import { useUndoNotice } from './undo-notice'
 import { useEdgeSwipeBack } from './useEdgeSwipeBack'
 
@@ -138,7 +139,8 @@ export function Layout() {
           <aside className="w-[var(--sidebar-width)] shrink-0 border-r border-hairline bg-sidebar">
             <Sidebar />
           </aside>
-          <main className="min-w-0 flex-1 overflow-y-auto">
+          <main className="relative min-w-0 flex-1 overflow-y-auto">
+            <DesktopChrome />
             <Outlet />
           </main>
           <KeyboardPanels />

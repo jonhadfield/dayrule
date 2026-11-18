@@ -56,7 +56,13 @@ export function ListShell({
     })
   }, [placementKey, orderField, projectId])
   return (
-    <div className="list-in relative mx-auto w-full max-w-[var(--reading-max-width)] px-[var(--list-chrome-inset)] pt-3 pb-28 md:pt-5">
+    <div
+      className={
+        'list-in relative mx-auto w-full max-w-[var(--reading-max-width)] px-[var(--list-chrome-inset)] pt-3 pb-28 md:pt-5' +
+        // Leave room for DesktopChrome (Lock · Find · Settings) on narrow panes.
+        (isDesktop ? ' pr-[7.5rem]' : '')
+      }
+    >
       {!isDesktop && (
         <Link
           to="/"
