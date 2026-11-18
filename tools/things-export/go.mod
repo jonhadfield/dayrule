@@ -1,6 +1,6 @@
 module github.com/jonhadfield/dayrule/tools/things-export
 
-go 1.26.0
+go 1.27.4
 
 require (
 	howett.net/plist v1.0.1
