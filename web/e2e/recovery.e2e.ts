@@ -5,7 +5,14 @@
 
 import { createHash } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
-import { add, PASSWORD, signIn, signUp, stubBreachCheck } from './helpers'
+import {
+  add,
+  openAccount,
+  PASSWORD,
+  signIn,
+  signUp,
+  stubBreachCheck,
+} from './helpers'
 
 const CHANGED = 'lantern moss quarry'
 const RECOVERED = 'pebble harbour violet'

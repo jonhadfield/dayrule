@@ -17,10 +17,7 @@ export function DesktopChrome() {
       <ChromeButton label="Lock (⇧⌘L)" onClick={() => void lock()}>
         <Lock size={16} strokeWidth={2.25} />
       </ChromeButton>
-      <ChromeButton
-        label="Find (⌘F)"
-        onClick={() => useUI.getState().find('')}
-      >
+      <ChromeButton label="Find (⌘F)" onClick={() => useUI.getState().find('')}>
         <Search size={16} strokeWidth={2.25} />
       </ChromeButton>
       <ChromeButton

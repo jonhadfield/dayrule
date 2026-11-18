@@ -74,7 +74,7 @@ func (a *Accounts) fetchIcs(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, errBadRequest("Couldn’t fetch that calendar."))
 		return
 	}
-	defer res.Body.Close()
+	defer func() { _ = res.Body.Close() }()
 	if res.StatusCode < 200 || res.StatusCode >= 300 {
 		writeErr(w, errBadRequest("That calendar didn’t respond."))
 		return

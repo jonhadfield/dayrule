@@ -3,7 +3,7 @@
 
 import { expect, test } from '@playwright/test'
 import { audit, report, type Found } from './axe'
-import { add, signUp } from './helpers'
+import { add, settingsButton, signUp } from './helpers'
 
 test('desktop screens have no serious accessibility problems', async ({
   page,

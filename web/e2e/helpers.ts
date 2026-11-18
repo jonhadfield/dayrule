@@ -111,15 +111,22 @@ export async function add(page: Page, title: string) {
   await expect(page.getByText(title, { exact: true })).toBeVisible()
 }
 
+/** Sidebar Settings (desktop also has chrome Settings in the detail pane). */
+export function settingsButton(page: Page) {
+  return page
+    .getByRole('navigation', { name: 'Lists' })
+    .getByRole('button', { name: 'Settings' })
+}
+
 export async function openAccount(page: Page) {
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await settingsButton(page).click()
   await page.getByRole('button', { name: 'Account…' }).click()
   return page.getByRole('dialog', { name: 'Account' })
 }
 
 export async function signOut(page: Page) {
   await page.keyboard.press('Escape')
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await settingsButton(page).click()
   await page.getByRole('button', { name: 'Sign out' }).click()
   await expect(page.getByRole('button', { name: 'Sign in' })).toBeVisible({
     timeout: 30_000,
