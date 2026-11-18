@@ -32,11 +32,16 @@ function deadlineLabel(deadline: string, today: string): string {
   return formatDisplayDate(deadline)
 }
 
-/** Day-granularity overdue chip (native Today trailing). */
-function overdueChipLabel(anchor: string, today: string): string {
+/** Day-granularity past-date chip (Today trailing). */
+function daysPastLabel(
+  anchor: string,
+  today: string,
+  word: 'overdue' | 'late',
+) {
   const ms = fromLocalDate(today).getTime() - fromLocalDate(anchor).getTime()
   const days = Math.max(1, Math.round(ms / 86_400_000))
-  return days === 1 ? '1d overdue' : `${days}d overdue`
+  const n = days === 1 ? '1d' : `${days}d`
+  return `${n} ${word}`
 }
 
 /** Drag wiring from a sortable list (see ItemList). */
@@ -97,11 +102,6 @@ export function TodoRow({
     !overdueDeadline &&
     todo.startDate !== undefined &&
     todo.startDate < ctx.today
-  const todayOverdueAnchor = overdueDeadline
-    ? todo.deadline
-    : overdueWhen
-      ? todo.startDate
-      : undefined
 
   const toggle = () =>
     store.run(done ? 'Reopen' : 'Complete', (d, env) =>
@@ -234,13 +234,24 @@ export function TodoRow({
           ) : null,
         )}
         {showTodayMeta && !done ? (
-          todayOverdueAnchor ? (
+          overdueDeadline && todo.deadline ? (
+            // Flag matches other lists + the sidebar overdue badge (deadlines only).
             <span
               aria-hidden
+              title="Deadline overdue"
+              className="flex shrink-0 items-center gap-1 text-xs text-deadline"
+            >
+              <Flag size={12} aria-hidden />
+              {daysPastLabel(todo.deadline, ctx.today, 'overdue')}
+            </span>
+          ) : overdueWhen && todo.startDate ? (
+            <span
+              aria-hidden
+              title="When is past"
               className="flex shrink-0 items-center gap-1 text-xs text-deadline"
             >
               <Clock size={12} aria-hidden />
-              {overdueChipLabel(todayOverdueAnchor, ctx.today)}
+              {daysPastLabel(todo.startDate, ctx.today, 'late')}
             </span>
           ) : (
             <span

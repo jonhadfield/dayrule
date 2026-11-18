@@ -446,7 +446,10 @@ export function filterByTag<T extends Item>(
 export interface SidebarCounts {
   inbox: number
   today: number
-  /** Items in Today whose deadline has passed: shown as a red badge. */
+  /**
+   * Open Today items with a deadline before today: red sidebar badge.
+   * Past When alone is not counted (Today shows a clock “late” chip instead).
+   */
   overdue: number
 }
 
