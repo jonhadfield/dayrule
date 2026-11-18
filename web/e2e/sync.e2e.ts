@@ -4,7 +4,8 @@
 import { expect, test, type Page } from '@playwright/test'
 import { add, signIn, signUp } from './helpers'
 
-const titles = (page: Page) => page.getByRole('main').getByRole('listitem')
+const titles = (page: Page) =>
+  page.getByRole('main').getByRole('listitem').locator('[data-todo-title]')
 
 test('two devices edit offline and converge', async ({ browser }) => {
   const email = `e2e-${Date.now()}@example.com`

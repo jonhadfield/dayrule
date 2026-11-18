@@ -179,6 +179,7 @@ export function TodoRow({
               </span>
             )}
             <span
+              data-todo-title
               className={`truncate ${done ? 'text-text-secondary line-through' : ''} ${todo.title ? '' : 'text-text-secondary'}`}
             >
               {todo.title || 'Untitled'}
