@@ -34,8 +34,7 @@ function deadlineLabel(deadline: string, today: string): string {
 
 /** Day-granularity overdue chip (native Today trailing). */
 function overdueChipLabel(anchor: string, today: string): string {
-  const ms =
-    fromLocalDate(today).getTime() - fromLocalDate(anchor).getTime()
+  const ms = fromLocalDate(today).getTime() - fromLocalDate(anchor).getTime()
   const days = Math.max(1, Math.round(ms / 86_400_000))
   return days === 1 ? '1d overdue' : `${days}d overdue`
 }
@@ -235,12 +234,18 @@ export function TodoRow({
         )}
         {showTodayMeta && !done ? (
           todayOverdueAnchor ? (
-            <span className="flex shrink-0 items-center gap-1 text-xs text-deadline">
+            <span
+              aria-hidden
+              className="flex shrink-0 items-center gap-1 text-xs text-deadline"
+            >
               <Clock size={12} aria-hidden />
               {overdueChipLabel(todayOverdueAnchor, ctx.today)}
             </span>
           ) : (
-            <span className="flex shrink-0 items-center gap-1 text-xs text-text-secondary">
+            <span
+              aria-hidden
+              className="flex shrink-0 items-center gap-1 text-xs text-text-secondary"
+            >
               <CalendarDays size={12} aria-hidden />
               Today
             </span>
