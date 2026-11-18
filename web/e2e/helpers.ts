@@ -1,23 +1,11 @@
 // Shared steps for end-to-end tests: accounts and to-dos via the real UI.
 
-import { execFileSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 import { readFileSync } from 'node:fs'
 import { expect, type Page } from '@playwright/test'
 
 const OUT = new URL('./.out/', import.meta.url)
 export const PASSWORD = 'orange kettle drift'
-
-function newInvite(): string {
-  return execFileSync(new URL('invite', OUT).pathname, ['1'], {
-    env: {
-      ...process.env,
-      DATABASE_URL_UNPOOLED: process.env.E2E_DATABASE_URL,
-    },
-  })
-    .toString()
-    .trim()
-}
 
 /** The latest code emailed to an address (logged by the API in tests). */
 export async function emailCode(email: string): Promise<string> {
@@ -59,7 +47,6 @@ export async function signUp(
   await stubBreachCheck(page)
   await page.goto('/')
   await page.getByRole('button', { name: 'Create an account' }).click()
-  await page.getByLabel('Invite code').fill(newInvite())
   await page.getByLabel('Email').fill(email)
   await page.getByRole('button', { name: 'Send code' }).click()
   await page.getByLabel('Code').fill(await emailCode(email))

@@ -139,7 +139,7 @@ func newAccounts(pool *pgxpool.Pool, logger *slog.Logger) (*httpapi.Accounts, er
 		Store:      accounts,
 		Keys:       keys,
 		Email:      sender,
-		InviteOnly: os.Getenv("INVITE_ONLY") != "false", // decision 2: invite-only until M7
+		InviteOnly: os.Getenv("INVITE_ONLY") != "false", // decision 27: false opens signup
 		Now:        time.Now,
 		Logger:     logger,
 		Passkeys:   passkeys,

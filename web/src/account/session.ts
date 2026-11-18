@@ -56,11 +56,9 @@ async function finishUnlock(profile: Omit<Profile, 'key'>, remember: boolean) {
 // Sign-up (decision 4): email code first, keys created after the recovery
 // phrase has been confirmed, then the account is registered.
 
-export async function signUpStart(
-  email: string,
-  inviteCode: string,
-): Promise<void> {
-  await api('POST', '/auth/signup/start', { email, inviteCode })
+export async function signUpStart(email: string): Promise<void> {
+  // Invite codes are optional once `INVITE_ONLY=false` on the server.
+  await api('POST', '/auth/signup/start', { email })
 }
 
 export async function signUpVerify(
@@ -105,14 +103,12 @@ export async function prepareAccount(
 export async function register(
   email: string,
   signupToken: string,
-  inviteCode: string,
   pending: PendingAccount,
   remember: boolean,
 ): Promise<void> {
   await api('POST', '/auth/register', {
     email,
     signupToken,
-    inviteCode,
     userId: pending.userId,
     ...pending.creds,
     wrappedRecovery: pending.wrappedRecovery,
