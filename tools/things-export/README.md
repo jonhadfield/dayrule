@@ -10,7 +10,7 @@ JSON**.
 ## Usage
 
 ```bash
-# From tools/things-export (Go 1.26+):
+# From tools/things-export (Go 1.27+):
 go run . -o things.json
 
 # Or point at a specific Things main.sqlite:
