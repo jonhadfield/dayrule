@@ -16,6 +16,7 @@ interface Props {
   ctx: ListContext
   showContainer?: boolean
   showStartDate?: boolean
+  showTodayMeta?: boolean
   /** Makes the to-dos sortable within this group and a drop target. */
   group?: Group
 }
@@ -25,11 +26,13 @@ export function ItemList({
   ctx,
   showContainer,
   showStartDate,
+  showTodayMeta,
   group,
 }: Props) {
   const rowProps = {
     ...(showContainer !== undefined ? { showContainer } : {}),
     ...(showStartDate !== undefined ? { showStartDate } : {}),
+    ...(showTodayMeta !== undefined ? { showTodayMeta } : {}),
   }
   if (!group) {
     if (items.length === 0) return null
@@ -59,7 +62,11 @@ function SortableList({
   items: Item[]
   ctx: ListContext
   group: Group
-  rowProps: { showContainer?: boolean; showStartDate?: boolean }
+  rowProps: {
+    showContainer?: boolean
+    showStartDate?: boolean
+    showTodayMeta?: boolean
+  }
 }) {
   const todoIds = items.filter((i) => i.type === 'todo').map((i) => i.id)
   const { setNodeRef, isOver } = useDroppable({
@@ -105,6 +112,7 @@ function SortableTodo({
   group: Group
   showContainer?: boolean
   showStartDate?: boolean
+  showTodayMeta?: boolean
 }) {
   const data: DragData = { type: 'todo', id: todo.id, group }
   const { setNodeRef, listeners, transform, transition, isDragging } =
