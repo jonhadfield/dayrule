@@ -509,7 +509,8 @@ function Devices() {
         </li>
         <li>
           <strong>Android:</strong> in Chrome, open the menu and choose Install
-          app.
+          app. From other apps, Share → Dayrule creates an Inbox to-do with the
+          shared title, text and link.
         </li>
         <li>
           <strong>Computer:</strong> in Chrome or Edge, click the install icon
@@ -519,6 +520,14 @@ function Devices() {
       <P>
         When there’s a new version of Dayrule, a message offers <K>Reload</K>.
         Nothing changes until you choose it.
+      </P>
+      <H2>Bookmarklet</H2>
+      <P>
+        On a computer, Account → Your data → <K>Copy bookmarklet</K> puts a
+        small script on the clipboard. Create a bookmark whose address is that
+        script (or drag it to the bookmarks bar). On any webpage, open the
+        bookmark: Dayrule’s Inbox opens with that page’s title, any text you
+        selected, and its address — the same fields Android Share uses.
       </P>
       <H2>Locking</H2>
       <P>
