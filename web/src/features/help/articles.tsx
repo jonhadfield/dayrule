@@ -305,7 +305,10 @@ function Scheduling() {
       <H2>Deadlines</H2>
       <P>
         A deadline puts a flag on the to-do. On the day it’s due, it appears in
-        Today even if you didn’t schedule it, and it turns red if it’s late.
+        Today even if you didn’t schedule it. In Today, a late deadline shows a
+        red flag and “Xd overdue”; a past When (no late deadline) shows a clock
+        and “Xd late”. The red number next to Today in the sidebar counts only
+        late deadlines.
       </P>
       <H2>Repeating to-dos</H2>
       <P>
