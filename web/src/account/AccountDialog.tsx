@@ -962,22 +962,33 @@ function DataSection() {
   )
 }
 
-/** Calendar overlay (§8.3): local .ics import only (no URL fetch yet). */
+/** Calendar overlay (§8.3): local .ics import or URL via Dayrule’s API. */
 function CalendarSection() {
   const events = useCalendarOverlay((s) => s.events)
   const sourceName = useCalendarOverlay((s) => s.sourceName)
   const setFromIcs = useCalendarOverlay((s) => s.setFromIcs)
+  const fetchFromUrl = useCalendarOverlay((s) => s.fetchFromUrl)
   const clear = useCalendarOverlay((s) => s.clear)
+  const [url, setUrl] = useState('')
+  const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const report = (n: number) =>
+    setDone(
+      n === 0
+        ? 'No events found.'
+        : `Showing ${n} event${n === 1 ? '' : 's'} on Today and Scheduled.`,
+    )
 
   return (
     <Section title="Calendar">
       <p className="mb-3 text-sm text-text-secondary">
-        Import an <code className="text-xs">.ics</code> file to show events on
-        Today and Scheduled. Parsing stays in this browser; events are not
-        synced and clear when you lock. Fetching a calendar URL (and any CORS
-        proxy) is not enabled yet — a proxy would see the feed URL.
+        Show events on Today and Scheduled from a local{' '}
+        <code className="text-xs">.ics</code> file, or from an https calendar
+        URL. Parsing stays in this browser; events are not synced and clear when
+        you lock. Fetching a URL goes through Dayrule’s servers so they see the
+        feed address (and briefly its contents) — see the privacy notice.
       </p>
       <Done text={done} />
       <ErrorText error={error} />
@@ -987,6 +998,34 @@ function CalendarSection() {
           {sourceName ? ` from ${sourceName}` : ''}.
         </p>
       )}
+      <form
+        className="mb-3 flex flex-wrap gap-2"
+        onSubmit={(e) => {
+          e.preventDefault()
+          const next = url.trim()
+          if (!next) return
+          setBusy(true)
+          setError(null)
+          setDone(null)
+          void fetchFromUrl(next)
+            .then(report)
+            .catch((err: unknown) => setError(message(err)))
+            .finally(() => setBusy(false))
+        }}
+      >
+        <input
+          type="url"
+          inputMode="url"
+          placeholder="https://…"
+          value={url}
+          onChange={(e) => setUrl(e.target.value)}
+          className="min-w-0 flex-1 rounded-[6px] border border-hairline bg-bg px-2 py-1.5 text-sm"
+          aria-label="Calendar URL"
+        />
+        <button type="submit" disabled={busy || !url.trim()} className={button}>
+          Fetch URL
+        </button>
+      </form>
       <div className="flex flex-wrap gap-2">
         <label className={`${button} cursor-pointer`}>
           Import .ics…
@@ -1002,14 +1041,7 @@ function CalendarSection() {
               setDone(null)
               void file
                 .text()
-                .then((text) => {
-                  const n = setFromIcs(text, file.name)
-                  setDone(
-                    n === 0
-                      ? 'No events found in that file.'
-                      : `Showing ${n} event${n === 1 ? '' : 's'} on Today and Scheduled.`,
-                  )
-                })
+                .then((text) => report(setFromIcs(text, file.name)))
                 .catch(() => setError('That file couldn’t be read.'))
             }}
           />

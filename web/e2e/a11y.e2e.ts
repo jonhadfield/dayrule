@@ -3,7 +3,7 @@
 
 import { expect, test } from '@playwright/test'
 import { audit, report, type Found } from './axe'
-import { add, signUp } from './helpers'
+import { add, settingsButton, signUp } from './helpers'
 
 test('desktop screens have no serious accessibility problems', async ({
   page,
@@ -54,7 +54,7 @@ test('desktop screens have no serious accessibility problems', async ({
   await audit(page, 'quick find: nothing found', found)
   await page.keyboard.press('Escape')
 
-  await page.getByRole('button', { name: 'Settings' }).click()
+  await settingsButton(page).click()
   await audit(page, 'settings', found)
   await page.getByText('Account…').click()
   await audit(page, 'account', found)

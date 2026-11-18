@@ -60,6 +60,7 @@ func (a *Accounts) routes(mux *http.ServeMux) {
 	mux.HandleFunc("DELETE /api/v1/account", a.withSession(a.deleteAccount))
 	a.passkeyRoutes(mux)
 	a.twoStepRoutes(mux)
+	a.calendarRoutes(mux)
 }
 
 // ---------------------------------------------------------------------------

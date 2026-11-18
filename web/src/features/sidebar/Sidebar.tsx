@@ -18,6 +18,7 @@ import { SyncStatus } from './SyncStatus'
 import { APP_VERSION } from '../../app/pwa'
 import { lock, signOut, useAccount } from '../../account/session'
 import { AccountDialog } from '../../account/AccountDialog'
+import { useUI } from '../../app/ui-state'
 import { DropTarget } from '../dnd/DropTarget'
 import type { DropAction } from '../dnd/types'
 import type { ListKey } from '../../ui/lists'
@@ -44,6 +45,8 @@ export function Sidebar() {
   const [theme, setTheme] = useState<Theme>(storedTheme)
   const accountEmail = useAccount((s) => s.profile?.email ?? '')
   const [accountOpen, setAccountOpen] = useState(false)
+  const settingsOpen = useUI((s) => s.settingsOpen)
+  const setSettingsOpen = useUI((s) => s.setSettingsOpen)
   const counts = sidebarCounts(e, ctx)
 
   const projects = Object.values(e.projects)
@@ -188,6 +191,8 @@ export function Sidebar() {
         <Popover
           title="Settings"
           align="end"
+          open={settingsOpen}
+          onOpenChange={setSettingsOpen}
           trigger={
             <button
               type="button"

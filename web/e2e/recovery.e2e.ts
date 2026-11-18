@@ -5,7 +5,14 @@
 
 import { createHash } from 'node:crypto'
 import { expect, test, type Page } from '@playwright/test'
-import { add, PASSWORD, signIn, signUp, stubBreachCheck } from './helpers'
+import {
+  add,
+  openAccount,
+  PASSWORD,
+  signIn,
+  signUp,
+  stubBreachCheck,
+} from './helpers'
 
 const CHANGED = 'lantern moss quarry'
 const RECOVERED = 'pebble harbour violet'
@@ -38,9 +45,7 @@ test('change the password, then recover with the phrase', async ({ page }) => {
 
   // Change the password in Account settings; a breached one is refused.
   await stubBreachCheck(page, [suffix(BREACHED)])
-  await page.getByRole('button', { name: 'Settings' }).click()
-  await page.getByRole('button', { name: 'Account…' }).click()
-  const account = page.getByRole('dialog', { name: 'Account' })
+  const account = await openAccount(page)
   const form = account.locator('form').filter({
     has: page.getByRole('button', { name: 'Change password' }),
   })
