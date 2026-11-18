@@ -108,6 +108,10 @@ export function Calendar({ today, selected, min, onSelect }: Props) {
               const disabled = min !== undefined && day.date < min
               const isSelected = day.date === selected
               const isToday = day.date === today
+              const dayNum = Number(day.date.slice(8))
+              // Visible day digit must appear in the accessible name (axe
+              // label-content-name-mismatch); keep the full date after it.
+              const label = `${dayNum} ${day.date.replaceAll('-', '/')}`
               return (
                 <span
                   key={day.date}
@@ -119,7 +123,7 @@ export function Calendar({ today, selected, min, onSelect }: Props) {
                     data-date={day.date}
                     type="button"
                     tabIndex={day.date === focus ? 0 : -1}
-                    aria-label={day.date.replaceAll('-', '/')}
+                    aria-label={label}
                     aria-current={isToday ? 'date' : undefined}
                     disabled={disabled}
                     onClick={() => onSelect(day.date)}
@@ -136,7 +140,7 @@ export function Calendar({ today, selected, min, onSelect }: Props) {
                       disabled ? 'cursor-not-allowed opacity-30' : '',
                     ].join(' ')}
                   >
-                    {Number(day.date.slice(8))}
+                    {dayNum}
                   </button>
                 </span>
               )
