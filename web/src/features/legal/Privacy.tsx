@@ -73,8 +73,10 @@ export function Privacy() {
           Calendar — we fetch that https address on your behalf so the browser
           never talks to a third-party calendar host. We see the URL and briefly
           the feed body (event titles and times) while returning it to your
-          browser; we don’t store the feed. A local{' '}
-          <code className="text-xs">.ics</code> file never leaves your device.
+          browser; we don’t keep the feed on our servers. Your browser may
+          remember the URL and last feed on this device so events return after
+          unlock. A local <code className="text-xs">.ics</code> file never
+          leaves your device.
         </li>
       </List>
       <P>

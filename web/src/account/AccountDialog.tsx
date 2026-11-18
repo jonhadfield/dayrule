@@ -48,6 +48,7 @@ import {
 } from './twostep'
 import { QrCode } from './QrCode'
 import { useCalendarOverlay } from '../calendar/overlay'
+import { inboxBookmarklet } from '../features/todo/bookmarklet'
 import { deviceLabel } from './api'
 import { ErrorText, Field } from './ui'
 import { message, newPasswordProblem } from './validation'
@@ -958,7 +959,39 @@ function DataSection() {
           />
         </label>
       </div>
+      <BookmarkletBlurb
+        onCopied={() =>
+          setDone(
+            'Bookmarklet copied. Drag it to your bookmarks bar, or paste it as a new bookmark’s URL.',
+          )
+        }
+      />
     </Section>
+  )
+}
+
+/** Share Target-shaped bookmarklet (PLAN.md §8.4). */
+function BookmarkletBlurb({ onCopied }: { onCopied: () => void }) {
+  return (
+    <div className="mt-4 border-t border-hairline pt-3">
+      <p className="mb-2 text-sm text-text-secondary">
+        From any webpage, a bookmarklet can open Dayrule’s Inbox with that
+        page’s title, your selection, and its address — same as Android Share.
+        Details in Help → Phones, computers and sync.
+      </p>
+      <button
+        type="button"
+        className={button}
+        onClick={() => {
+          void navigator.clipboard
+            .writeText(inboxBookmarklet(window.location.origin))
+            .then(onCopied)
+            .catch(() => undefined)
+        }}
+      >
+        Copy bookmarklet
+      </button>
+    </div>
   )
 }
 
@@ -966,10 +999,12 @@ function DataSection() {
 function CalendarSection() {
   const events = useCalendarOverlay((s) => s.events)
   const sourceName = useCalendarOverlay((s) => s.sourceName)
+  const sourceUrl = useCalendarOverlay((s) => s.sourceUrl)
   const setFromIcs = useCalendarOverlay((s) => s.setFromIcs)
   const fetchFromUrl = useCalendarOverlay((s) => s.fetchFromUrl)
+  const refresh = useCalendarOverlay((s) => s.refresh)
   const clear = useCalendarOverlay((s) => s.clear)
-  const [url, setUrl] = useState('')
+  const [url, setUrl] = useState(() => sourceUrl ?? '')
   const [busy, setBusy] = useState(false)
   const [done, setDone] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -981,14 +1016,25 @@ function CalendarSection() {
         : `Showing ${n} event${n === 1 ? '' : 's'} on Today and Scheduled.`,
     )
 
+  const run = (fn: () => Promise<number>) => {
+    setBusy(true)
+    setError(null)
+    setDone(null)
+    void fn()
+      .then(report)
+      .catch((err: unknown) => setError(message(err)))
+      .finally(() => setBusy(false))
+  }
+
   return (
     <Section title="Calendar">
       <p className="mb-3 text-sm text-text-secondary">
         Show events on Today and Scheduled from a local{' '}
         <code className="text-xs">.ics</code> file, or from an https calendar
-        URL. Parsing stays in this browser; events are not synced and clear when
-        you lock. Fetching a URL goes through Dayrule’s servers so they see the
-        feed address (and briefly its contents) — see the privacy notice.
+        URL. Parsing stays in this browser; the last feed is remembered on this
+        device (not synced) so it returns after unlock. Fetching a URL goes
+        through Dayrule’s servers so they see the feed address (and briefly its
+        contents) — see the privacy notice.
       </p>
       <Done text={done} />
       <ErrorText error={error} />
@@ -1004,13 +1050,7 @@ function CalendarSection() {
           e.preventDefault()
           const next = url.trim()
           if (!next) return
-          setBusy(true)
-          setError(null)
-          setDone(null)
-          void fetchFromUrl(next)
-            .then(report)
-            .catch((err: unknown) => setError(message(err)))
-            .finally(() => setBusy(false))
+          run(() => fetchFromUrl(next))
         }}
       >
         <input
@@ -1025,6 +1065,16 @@ function CalendarSection() {
         <button type="submit" disabled={busy || !url.trim()} className={button}>
           Fetch URL
         </button>
+        {sourceUrl && (
+          <button
+            type="button"
+            disabled={busy}
+            className={button}
+            onClick={() => run(() => refresh())}
+          >
+            Refresh
+          </button>
+        )}
       </form>
       <div className="flex flex-wrap gap-2">
         <label className={`${button} cursor-pointer`}>
@@ -1041,17 +1091,21 @@ function CalendarSection() {
               setDone(null)
               void file
                 .text()
-                .then((text) => report(setFromIcs(text, file.name)))
+                .then((text) => {
+                  report(setFromIcs(text, file.name, null))
+                  setUrl('')
+                })
                 .catch(() => setError('That file couldn’t be read.'))
             }}
           />
         </label>
-        {events.length > 0 && (
+        {(events.length > 0 || sourceUrl) && (
           <button
             type="button"
             className={button}
             onClick={() => {
               clear()
+              setUrl('')
               setDone('Calendar overlay cleared.')
             }}
           >
