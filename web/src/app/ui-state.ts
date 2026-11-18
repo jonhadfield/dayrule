@@ -26,6 +26,8 @@ interface UIState {
   selecting: boolean
   /** Quick Find: null when closed, else the text to start with. */
   finding: string | null
+  /** Desktop Settings popover / mobile Settings sheet. */
+  settingsOpen: boolean
   /** A to-do to select (desktop) or open (mobile) once its list shows. */
   pendingFocus: { todoId: string; path: string } | null
   /** Just-completed to-dos still shown: 'shown', then 'leaving' as they fold away. */
@@ -53,6 +55,7 @@ interface UIState {
   startSelecting: (id: string) => void
   stopSelecting: () => void
   find: (query: string | null) => void
+  setSettingsOpen: (open: boolean) => void
   focusAfterNavigation: (
     target: { todoId: string; path: string } | null,
   ) => void
@@ -74,6 +77,7 @@ export const useUI = create<UIState>((set) => ({
   panelIds: null,
   selecting: false,
   finding: null,
+  settingsOpen: false,
   pendingFocus: null,
   lingering: {},
   listTodoIds: null,
@@ -143,6 +147,7 @@ export const useUI = create<UIState>((set) => ({
   stopSelecting: () =>
     set({ selecting: false, selectedIds: [], anchorId: null }),
   find: (finding) => set({ finding }),
+  setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   focusAfterNavigation: (pendingFocus) => set({ pendingFocus }),
 }))
 

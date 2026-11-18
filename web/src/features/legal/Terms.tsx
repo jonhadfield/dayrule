@@ -5,7 +5,7 @@ export function Terms() {
     <article>
       <H1>Terms</H1>
       <p className="mb-6 text-sm text-text-secondary">
-        Last updated 17 October 2026
+        Last updated 18 November 2026
       </p>
 
       <P>
