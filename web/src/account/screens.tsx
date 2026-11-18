@@ -352,7 +352,6 @@ type Step = 'details' | 'code' | 'password' | 'phrase' | 'confirm'
 function SignUp({ onCancel }: { onCancel: () => void }) {
   const [step, setStep] = useState<Step>('details')
   const [email, setEmail] = useState('')
-  const [invite, setInvite] = useState('')
   const [code, setCode] = useState('')
   const [token, setToken] = useState('')
   const [password, setPassword] = useState('')
@@ -365,23 +364,15 @@ function SignUp({ onCancel }: { onCancel: () => void }) {
     return (
       <AuthShell
         title="Create an account"
-        subtitle="Dayrule is invite-only for now."
+        subtitle="We’ll email a code, then show your recovery phrase."
       >
         <form
           onSubmit={run(async () => {
-            await signUpStart(email, invite)
+            await signUpStart(email)
             setStep('code')
           })}
         >
           <ErrorText error={error} />
-          <Field
-            label="Invite code"
-            required
-            autoCapitalize="characters"
-            value={invite}
-            onChange={(e) => setInvite(e.target.value)}
-            placeholder="XXXX-XXXX-XXXX"
-          />
           <Field
             label="Email"
             type="email"
@@ -520,9 +511,7 @@ function SignUp({ onCancel }: { onCancel: () => void }) {
         remember={remember}
         setRemember={setRemember}
         onBack={() => setStep('phrase')}
-        onConfirmed={run(() =>
-          register(email, token, invite, pending, remember),
-        )}
+        onConfirmed={run(() => register(email, token, pending, remember))}
       />
     )
   }

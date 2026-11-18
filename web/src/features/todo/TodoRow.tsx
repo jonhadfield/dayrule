@@ -2,6 +2,7 @@ import {
   Bell,
   CalendarDays,
   CircleCheck,
+  Clock,
   FileText,
   Flag,
   ListChecks,
@@ -10,7 +11,11 @@ import {
 import type { CSSProperties } from 'react'
 import { useAllEntities, useEntityStore, useIsDesktop } from '../../app/context'
 import { useUI, visibleTodoIds } from '../../app/ui-state'
-import { formatDisplayDate, addLocalDays } from '../../domain/dates'
+import {
+  formatDisplayDate,
+  addLocalDays,
+  fromLocalDate,
+} from '../../domain/dates'
 import type { ListContext } from '../../domain/lists'
 import type { Todo } from '../../domain/types'
 import * as cmd from '../../store/commands'
@@ -25,6 +30,13 @@ function deadlineLabel(deadline: string, today: string): string {
   if (deadline < today) return `${formatDisplayDate(deadline)} (overdue)`
   if (deadline === addLocalDays(today, 1)) return 'tomorrow'
   return formatDisplayDate(deadline)
+}
+
+/** Day-granularity overdue chip (native Today trailing). */
+function overdueChipLabel(anchor: string, today: string): string {
+  const ms = fromLocalDate(today).getTime() - fromLocalDate(anchor).getTime()
+  const days = Math.max(1, Math.round(ms / 86_400_000))
+  return days === 1 ? '1d overdue' : `${days}d overdue`
 }
 
 /** Drag wiring from a sortable list (see ItemList). */
@@ -43,6 +55,8 @@ interface Props {
   showContainer?: boolean
   /** Show the start date (Done and Trash show other dates instead). */
   showStartDate?: boolean
+  /** Today list: trailing Today / overdue chip (native parity). */
+  showTodayMeta?: boolean
 }
 
 export function TodoRow({
@@ -51,6 +65,7 @@ export function TodoRow({
   ctx,
   showContainer = true,
   showStartDate = false,
+  showTodayMeta = false,
 }: Props) {
   const store = useEntityStore()
   const e = useAllEntities()
@@ -75,6 +90,18 @@ export function TodoRow({
       ? e.areas[todo.areaId]
       : undefined
   const done = todo.status !== 'open'
+  const overdueDeadline =
+    !done && todo.deadline !== undefined && todo.deadline < ctx.today
+  const overdueWhen =
+    !done &&
+    !overdueDeadline &&
+    todo.startDate !== undefined &&
+    todo.startDate < ctx.today
+  const todayOverdueAnchor = overdueDeadline
+    ? todo.deadline
+    : overdueWhen
+      ? todo.startDate
+      : undefined
 
   const toggle = () =>
     store.run(done ? 'Reopen' : 'Complete', (d, env) =>
@@ -152,6 +179,7 @@ export function TodoRow({
               </span>
             )}
             <span
+              data-todo-title
               className={`truncate ${done ? 'text-text-secondary line-through' : ''} ${todo.title ? '' : 'text-text-secondary'}`}
             >
               {todo.title || 'Untitled'}
@@ -205,13 +233,33 @@ export function TodoRow({
             </span>
           ) : null,
         )}
-        {todo.deadline && (
-          <span
-            className={`flex shrink-0 items-center gap-1 text-xs ${todo.deadline <= ctx.today && !done ? 'text-deadline' : 'text-text-secondary'}`}
-          >
-            <Flag size={12} aria-hidden />
-            {deadlineLabel(todo.deadline, ctx.today)}
-          </span>
+        {showTodayMeta && !done ? (
+          todayOverdueAnchor ? (
+            <span
+              aria-hidden
+              className="flex shrink-0 items-center gap-1 text-xs text-deadline"
+            >
+              <Clock size={12} aria-hidden />
+              {overdueChipLabel(todayOverdueAnchor, ctx.today)}
+            </span>
+          ) : (
+            <span
+              aria-hidden
+              className="flex shrink-0 items-center gap-1 text-xs text-text-secondary"
+            >
+              <CalendarDays size={12} aria-hidden />
+              Today
+            </span>
+          )
+        ) : (
+          todo.deadline && (
+            <span
+              className={`flex shrink-0 items-center gap-1 text-xs ${todo.deadline <= ctx.today && !done ? 'text-deadline' : 'text-text-secondary'}`}
+            >
+              <Flag size={12} aria-hidden />
+              {deadlineLabel(todo.deadline, ctx.today)}
+            </span>
+          )
         )}
       </div>
     </li>

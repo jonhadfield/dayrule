@@ -90,6 +90,7 @@ export function TodayPage() {
       <ItemList
         items={filterByTag(e, all, tag)}
         ctx={ctx}
+        showTodayMeta
         group={{
           id: 'today',
           drop: { kind: 'when', when: { kind: 'today' } },

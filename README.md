@@ -21,7 +21,7 @@ Native companions for iPhone, iPad and Mac live in
   device as ciphertext only
 - **Paper and ink** — warm, uncluttered UI; Fraunces for headings; no
   trackers or ad SDKs
-- **Invite-only** — accounts require an invite; no public signup funnel
+- **Open signup** — create an account with email verification (no invite)
 
 ## Stack
 
@@ -70,6 +70,6 @@ Agent and contributor conventions: [`AGENTS.md`](AGENTS.md).
 
 ## Licence
 
-Source is published for transparency and companion development. Dayrule the
-product remains invite-only at [dayrule.app](https://dayrule.app); the privacy
-notice, terms and open signup wait for a later product launch.
+Source is published for transparency and companion development. Sign up at
+[dayrule.app](https://dayrule.app); the privacy notice, terms and ICO fee wait
+for a later product launch.
