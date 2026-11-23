@@ -20,6 +20,7 @@ import (
 	"github.com/jonhadfield/dayrule/server/internal/email"
 	"github.com/jonhadfield/dayrule/server/internal/httpapi"
 	"github.com/jonhadfield/dayrule/server/internal/push"
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 	"github.com/jonhadfield/dayrule/server/internal/store"
 )
 
@@ -76,7 +77,7 @@ func run(logger *slog.Logger) error {
 				PublicKey:  pub,
 				PrivateKey: priv,
 				Subject:    "mailto:no-reply@dayrule.app",
-				Client:     &http.Client{Timeout: 10 * time.Second},
+				Client:     safehttp.Client(10 * time.Second),
 			}
 			cfg.Reminders.VAPIDPublicKey = pub
 		}

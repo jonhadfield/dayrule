@@ -15,6 +15,7 @@ import (
 
 	"github.com/jonhadfield/dayrule/server/internal/email"
 	"github.com/jonhadfield/dayrule/server/internal/push"
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 	"github.com/jonhadfield/dayrule/server/internal/store"
 )
 
@@ -127,9 +128,18 @@ type subscriptionReq struct {
 	} `json:"keys"`
 }
 
-func validEndpoint(e string) bool {
+func checkPushEndpoint(ctx context.Context, e string) error {
+	if len(e) == 0 || len(e) > 2048 {
+		return errBadRequest("Invalid push subscription.")
+	}
 	u, err := url.Parse(e)
-	return err == nil && u.Scheme == "https" && u.Host != "" && len(e) <= 2048
+	if err != nil || !safehttp.HTTPSURLAllowed(u) {
+		return errBadRequest("Invalid push subscription.")
+	}
+	if _, err := safehttp.PublicIPs(ctx, u.Hostname()); err != nil {
+		return errBadRequest("Invalid push subscription.")
+	}
+	return nil
 }
 
 func (s *Reminders) subscribe(w http.ResponseWriter, r *http.Request) {
@@ -138,7 +148,8 @@ func (s *Reminders) subscribe(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, err)
 		return
 	}
-	if !validEndpoint(req.Endpoint) || req.Keys.P256dh == "" || req.Keys.Auth == "" ||
+	if err := checkPushEndpoint(r.Context(), req.Endpoint); err != nil ||
+		req.Keys.P256dh == "" || req.Keys.Auth == "" ||
 		len(req.Keys.P256dh) > 256 || len(req.Keys.Auth) > 256 {
 		writeErr(w, errBadRequest("Invalid push subscription."))
 		return

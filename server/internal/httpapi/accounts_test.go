@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 	"github.com/jonhadfield/dayrule/server/internal/auth"
 	"github.com/jonhadfield/dayrule/server/internal/email"
 	"github.com/jonhadfield/dayrule/server/internal/push"
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 	"github.com/jonhadfield/dayrule/server/internal/store"
 	"github.com/jonhadfield/dayrule/server/internal/testdb"
 )
@@ -40,6 +42,17 @@ type harness struct {
 }
 
 func newHarness(t *testing.T) *harness {
+	t.Helper()
+	// Hermetic DNS for calendar/push SSRF checks (no real lookups in tests).
+	oldLookup := safehttp.Lookup
+	safehttp.Lookup = func(_ context.Context, host string) ([]net.IPAddr, error) {
+		if host == "private.test" {
+			return []net.IPAddr{{IP: net.ParseIP("10.0.0.1")}}, nil
+		}
+		return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}}, nil
+	}
+	t.Cleanup(func() { safehttp.Lookup = oldLookup })
+
 	pool := testdb.New(t)
 	keys, err := auth.NewKeys(bytes.Repeat([]byte("k"), 32))
 	if err != nil {
