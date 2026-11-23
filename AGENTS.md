@@ -47,6 +47,9 @@ From `server/`:
   that environment's `DATABASE_URL_UNPOOLED` (invites are stored as SHA-256).
 - `go run ./cmd/error-reports [n]` — lists the newest n client crash reports
   (message/stack only; decision 10). Needs `DATABASE_URL_UNPOOLED`.
+- `go run ./cmd/dayrule-ops users|stats|delete --email=…` — local operator
+  tooling (account list, usage metadata, delete with email confirmation).
+  Metadata only; needs `DATABASE_URL_UNPOOLED` for that environment.
 - `go run ./cmd/plaintext-check needle…` — lists the `table.column`s where
   any needle appears (also inside base64); used by `web/e2e/no-plaintext.e2e.ts`.
   Needs `DATABASE_URL_UNPOOLED`.
