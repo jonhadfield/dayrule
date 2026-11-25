@@ -486,8 +486,9 @@ func (a *Accounts) prelogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"salt": base64.StdEncoding.EncodeToString(salt), "kdf": kdf})
 }
 
-// checkPassword verifies an AuthKey with lockout. Unknown emails do the same
-// work and fail the same way.
+// checkPassword verifies an AuthKey with lockout. Unknown emails and wrong
+// AuthKeys fail the same way (bad_login). Lockout is only returned after a
+// correct AuthKey, so a locked account can't be spotted without the password.
 func (a *Accounts) checkPassword(ctx context.Context, u *store.User, authKeyB64 string) error {
 	authKey, err := b64(authKeyB64, 32)
 	if err != nil {
@@ -497,14 +498,17 @@ func (a *Accounts) checkPassword(ctx context.Context, u *store.User, authKeyB64 
 		auth.BurnVerify(authKey)
 		return errBadLogin
 	}
-	if u.LockedUntil != nil && u.LockedUntil.After(a.Now()) {
-		return errLocked
-	}
+	locked := u.LockedUntil != nil && u.LockedUntil.After(a.Now())
 	if !auth.VerifyAuthKey(authKey, u.AuthSalt, u.AuthHash) {
-		if err := a.Store.RecordFailedLogin(ctx, u.ID, a.Now()); err != nil {
-			return err
+		if !locked {
+			if err := a.Store.RecordFailedLogin(ctx, u.ID, a.Now()); err != nil {
+				return err
+			}
 		}
 		return errBadLogin
+	}
+	if locked {
+		return errLocked
 	}
 	if u.FailedLogins > 0 {
 		return a.Store.ResetFailedLogins(ctx, u.ID)
