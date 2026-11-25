@@ -239,6 +239,23 @@ func TestSignUpDoesNotRevealExistingAccounts(t *testing.T) {
 		t.Fatalf("existing email should get a notice without a code, got %q", m.Subject)
 	}
 
+	// Wrong verify after start must match for taken and free emails (bad_code).
+	freshInvite := hs.newInvite()
+	if r := c.do("POST", "/api/v1/auth/signup/start", map[string]string{
+		"email": "fresh@example.com", "inviteCode": freshInvite,
+	}); r.code != 202 {
+		t.Fatalf("fresh signup/start = %d %v", r.code, r.body)
+	}
+	bad := "000000"
+	if bad == hs.codeFor("fresh@example.com") {
+		bad = "111111"
+	}
+	taken := c.do("POST", "/api/v1/auth/signup/verify", map[string]string{"email": "bo@example.com", "code": bad})
+	free := c.do("POST", "/api/v1/auth/signup/verify", map[string]string{"email": "fresh@example.com", "code": bad})
+	if taken.code != free.code || taken.body["code"] != free.body["code"] || taken.body["code"] != "bad_code" {
+		t.Fatalf("verify reveals accounts: taken=%v free=%v", taken.body, free.body)
+	}
+
 	// Prelogin for an unknown email looks normal and is stable.
 	p1 := c.do("POST", "/api/v1/auth/prelogin", map[string]string{"email": "nobody@example.com"})
 	p2 := c.do("POST", "/api/v1/auth/prelogin", map[string]string{"email": "nobody@example.com"})
