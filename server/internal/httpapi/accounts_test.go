@@ -330,8 +330,14 @@ func TestLockoutAfterFailedLogins(t *testing.T) {
 	for range 5 {
 		c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": rnd(32)})
 	}
-	if r := c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey}); r.code != 429 {
-		t.Fatalf("not locked after 5 failures: %d", r.code)
+	// Wrong AuthKey while locked looks like a normal bad login (no enumeration).
+	wrong := c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": rnd(32)})
+	nobody := c.do("POST", "/api/v1/auth/login", map[string]string{"email": "nobody@example.com", "authKey": rnd(32)})
+	if wrong.code != 401 || nobody.code != 401 || wrong.body["code"] != nobody.body["code"] {
+		t.Fatalf("locked wrong vs unknown differ: %v / %v", wrong.body, nobody.body)
+	}
+	if r := c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey}); r.code != 429 || r.body["code"] != "locked" {
+		t.Fatalf("correct AuthKey while locked = %d %v", r.code, r.body)
 	}
 	hs.now = hs.now.Add(2 * time.Minute)
 	if r := c.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey}); r.code != 200 {
