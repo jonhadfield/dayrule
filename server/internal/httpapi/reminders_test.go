@@ -45,6 +45,12 @@ func TestReminderSettingsAndSending(t *testing.T) {
 	if r := a.c.do("POST", "/api/v1/push/subscriptions", map[string]any{"endpoint": "http://insecure.example.com", "keys": map[string]string{"p256dh": "x", "auth": "y"}}); r.code != 400 {
 		t.Fatalf("http endpoint should be refused, got %d", r.code)
 	}
+	if r := a.c.do("POST", "/api/v1/push/subscriptions", map[string]any{"endpoint": "https://127.0.0.1/x", "keys": map[string]string{"p256dh": "x", "auth": "y"}}); r.code != 400 {
+		t.Fatalf("loopback endpoint should be refused, got %d", r.code)
+	}
+	if r := a.c.do("POST", "/api/v1/push/subscriptions", map[string]any{"endpoint": "https://private.test/x", "keys": map[string]string{"p256dh": "x", "auth": "y"}}); r.code != 400 {
+		t.Fatalf("private DNS endpoint should be refused, got %d", r.code)
+	}
 
 	soon, later := uuid.NewString(), uuid.NewString()
 	put := func(rs ...map[string]any) {

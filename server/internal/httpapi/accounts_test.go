@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"log/slog"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -20,6 +21,7 @@ import (
 	"github.com/jonhadfield/dayrule/server/internal/auth"
 	"github.com/jonhadfield/dayrule/server/internal/email"
 	"github.com/jonhadfield/dayrule/server/internal/push"
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 	"github.com/jonhadfield/dayrule/server/internal/store"
 	"github.com/jonhadfield/dayrule/server/internal/testdb"
 )
@@ -40,6 +42,17 @@ type harness struct {
 }
 
 func newHarness(t *testing.T) *harness {
+	t.Helper()
+	// Hermetic DNS for calendar/push SSRF checks (no real lookups in tests).
+	oldLookup := safehttp.Lookup
+	safehttp.Lookup = func(_ context.Context, host string) ([]net.IPAddr, error) {
+		if host == "private.test" {
+			return []net.IPAddr{{IP: net.ParseIP("10.0.0.1")}}, nil
+		}
+		return []net.IPAddr{{IP: net.ParseIP("93.184.216.34")}}, nil
+	}
+	t.Cleanup(func() { safehttp.Lookup = oldLookup })
+
 	pool := testdb.New(t)
 	keys, err := auth.NewKeys(bytes.Repeat([]byte("k"), 32))
 	if err != nil {
@@ -237,6 +250,23 @@ func TestSignUpDoesNotRevealExistingAccounts(t *testing.T) {
 	m, _ := hs.mail.Last("bo@example.com")
 	if !strings.Contains(m.Subject, "already have") || codeRe.MatchString(m.Text) {
 		t.Fatalf("existing email should get a notice without a code, got %q", m.Subject)
+	}
+
+	// Wrong verify after start must match for taken and free emails (bad_code).
+	freshInvite := hs.newInvite()
+	if r := c.do("POST", "/api/v1/auth/signup/start", map[string]string{
+		"email": "fresh@example.com", "inviteCode": freshInvite,
+	}); r.code != 202 {
+		t.Fatalf("fresh signup/start = %d %v", r.code, r.body)
+	}
+	bad := "000000"
+	if bad == hs.codeFor("fresh@example.com") {
+		bad = "111111"
+	}
+	taken := c.do("POST", "/api/v1/auth/signup/verify", map[string]string{"email": "bo@example.com", "code": bad})
+	free := c.do("POST", "/api/v1/auth/signup/verify", map[string]string{"email": "fresh@example.com", "code": bad})
+	if taken.code != free.code || taken.body["code"] != free.body["code"] || taken.body["code"] != "bad_code" {
+		t.Fatalf("verify reveals accounts: taken=%v free=%v", taken.body, free.body)
 	}
 
 	// Prelogin for an unknown email looks normal and is stable.

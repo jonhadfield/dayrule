@@ -1,13 +1,13 @@
 package httpapi
 
 import (
-	"context"
 	"io"
-	"net"
 	"net/http"
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 )
 
 // Calendar serves the same-origin ICS fetch for Account → Calendar.
@@ -37,29 +37,27 @@ func (a *Accounts) fetchIcs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := url.Parse(raw)
-	if err != nil || !icsURLAllowed(u) {
+	if err != nil || !safehttp.HTTPSURLAllowed(u) {
 		writeErr(w, errBadRequest("Use an https:// calendar URL."))
 		return
 	}
-	if err := resolvePublic(r.Context(), u.Hostname()); err != nil {
-		writeErr(w, err)
+	if _, err := safehttp.PublicIPs(r.Context(), u.Hostname()); err != nil {
+		writeErr(w, errBadRequest("That calendar address isn’t allowed."))
 		return
 	}
 
-	client := &http.Client{
-		Timeout: icsFetchWait,
-		CheckRedirect: func(req *http.Request, via []*http.Request) error {
-			if len(via) >= 3 {
-				return errBadRequest("That calendar redirected too many times.")
-			}
-			if !icsURLAllowed(req.URL) {
-				return errBadRequest("That calendar redirected somewhere we can’t follow.")
-			}
-			if err := resolvePublic(req.Context(), req.URL.Hostname()); err != nil {
-				return err
-			}
-			return nil
-		},
+	client := safehttp.Client(icsFetchWait)
+	client.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if len(via) >= 3 {
+			return errBadRequest("That calendar redirected too many times.")
+		}
+		if !safehttp.HTTPSURLAllowed(req.URL) {
+			return errBadRequest("That calendar redirected somewhere we can’t follow.")
+		}
+		if _, err := safehttp.PublicIPs(req.Context(), req.URL.Hostname()); err != nil {
+			return errBadRequest("That calendar address isn’t allowed.")
+		}
+		return nil
 	}
 	out, err := http.NewRequestWithContext(r.Context(), http.MethodGet, u.String(), nil)
 	if err != nil {
@@ -94,61 +92,4 @@ func (a *Accounts) fetchIcs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, map[string]string{"text": text})
-}
-
-func icsURLAllowed(u *url.URL) bool {
-	if u == nil || u.Scheme != "https" || u.Host == "" || u.User != nil {
-		return false
-	}
-	// Reject literal IPs here; hostnames are checked via resolvePublic.
-	host := u.Hostname()
-	if host == "" || host == "localhost" || strings.HasSuffix(host, ".localhost") {
-		return false
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		return isPublicIP(ip)
-	}
-	return true
-}
-
-func resolvePublic(ctx context.Context, host string) error {
-	if host == "" {
-		return errBadRequest("Use an https:// calendar URL.")
-	}
-	if ip := net.ParseIP(host); ip != nil {
-		if !isPublicIP(ip) {
-			return errBadRequest("That calendar address isn’t allowed.")
-		}
-		return nil
-	}
-	addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
-	if err != nil || len(addrs) == 0 {
-		return errBadRequest("Couldn’t look up that calendar host.")
-	}
-	for _, a := range addrs {
-		if !isPublicIP(a.IP) {
-			return errBadRequest("That calendar address isn’t allowed.")
-		}
-	}
-	return nil
-}
-
-func isPublicIP(ip net.IP) bool {
-	if ip == nil {
-		return false
-	}
-	if ip.IsLoopback() || ip.IsPrivate() || ip.IsLinkLocalUnicast() ||
-		ip.IsLinkLocalMulticast() || ip.IsMulticast() || ip.IsUnspecified() {
-		return false
-	}
-	// Cloud metadata / CGNAT ranges often used in SSRF probes.
-	if ip4 := ip.To4(); ip4 != nil {
-		if ip4[0] == 169 && ip4[1] == 254 {
-			return false
-		}
-		if ip4[0] == 100 && ip4[1] >= 64 && ip4[1] <= 127 {
-			return false
-		}
-	}
-	return true
 }

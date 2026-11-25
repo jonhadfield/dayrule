@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"crypto/rand"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/json"
@@ -112,6 +113,14 @@ func b64(s string, n int) ([]byte, error) {
 		return nil, errBadRequest("Invalid key material.")
 	}
 	return b, nil
+}
+
+// decoyCodeHash is an unguessable stand-in for code_hash when the address
+// already has an account, so verify failures match a real wrong guess.
+func decoyCodeHash() ([]byte, error) {
+	b := make([]byte, 32)
+	_, err := rand.Read(b)
+	return b, err
 }
 
 func normEmail(s string) (string, error) {
@@ -276,8 +285,11 @@ func (a *Accounts) signupStart(w http.ResponseWriter, r *http.Request) {
 		return // rate limited: say nothing different
 	}
 	if _, err := a.Store.UserByEmail(r.Context(), addr); err == nil {
-		// Record a code row anyway so the rate limit applies equally.
-		_ = a.Store.CreateCode(r.Context(), addr, "signup", nil, make([]byte, 32), now)
+		// Same lifetime and shape as a real code so verify can't tell accounts
+		// apart (wrong guesses → bad_code, not expired_code). Hash is random.
+		if decoy, err := decoyCodeHash(); err == nil {
+			_ = a.Store.CreateCode(r.Context(), addr, "signup", nil, decoy, now.Add(codeLifetime))
+		}
 		a.send(r.Context(), email.AlreadyRegistered(addr))
 		return
 	}
@@ -741,7 +753,9 @@ func (a *Accounts) emailStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if _, err := a.Store.UserByEmail(r.Context(), addr); err == nil {
-		_ = a.Store.CreateCode(r.Context(), addr, "email_change", &u.ID, make([]byte, 32), now)
+		if decoy, err := decoyCodeHash(); err == nil {
+			_ = a.Store.CreateCode(r.Context(), addr, "email_change", &u.ID, decoy, now.Add(codeLifetime))
+		}
 		a.send(r.Context(), email.AlreadyRegistered(addr))
 		return
 	}

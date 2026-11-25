@@ -71,7 +71,7 @@ record types and timestamps, is inside the ciphertext.
 | Removing the second step with a stolen password and email access | The reset by email waits 7 days, with notices when asked, a day before and when done; signing in with a second step, a new password or Account cancels it. Email access alone still decrypts nothing, and codes are sent only after the password | `httpapi/twostep.go` |
 | Guessing a second-step code with a stolen password | 5 codes per sign-in attempt, and a lockout across attempts with back-off that a correct password doesn't reset; about 3 in a million chance per TOTP guess | `httpapi/twostep.go`, `store/twostep.go` |
 | Password spraying (one common password across many accounts) | New passwords are refused if they appear in Pwned Passwords; only a 5-character SHA-1 prefix leaves the browser, never through Dayrule's API; fails open | `account/breach.ts` |
-| Learning which emails have accounts | Fake salts for unknown emails; identical work and responses; sign-up always returns 202 | `httpapi/accounts.go` |
+| Learning which emails have accounts | Fake salts for unknown emails; identical work and responses; sign-up always returns 202; taken addresses get a decoy code row with the same TTL so verify wrong guesses return `bad_code` like a free address (not `expired_code`) | `httpapi/accounts.go` |
 | Session theft by script | HttpOnly cookie; no tokens in JavaScript | `httpapi/accounts.go` |
 | Cross-site requests | SameSite=Strict plus a required `X-Dayrule-Client` header on state-changing requests | `httpapi/middleware.go` |
 | Email change takeover | Needs the current AuthKey (the password) and a code sent to the new address; the old address is told | `httpapi/accounts.go` |
@@ -95,7 +95,8 @@ record types and timestamps, is inside the ciphertext.
 |---|---|---|
 | Storage abuse | Quotas: 50 MB, 100,000 records, 64 KB per record | `store/records.go` |
 | Sign-up spam | Email verification; Firewall rate limits (IP+JA4); no BotID challenge (decisions 25, 36); invite gate removable via `INVITE_ONLY` | `httpapi/accounts.go`, `docs/firewall.md` |
-| Calendar URL fetch SSRF | Session-required same-origin proxy; https only; no credentials in URL; DNS resolves to public IPs only (redirects re-checked); size and time limits; body must look like VCALENDAR | `httpapi/calendar.go` |
+| Calendar URL fetch SSRF | Session-required same-origin proxy; https only; no credentials in URL; DNS must be public-only (redirects re-checked); dial pins those IPs (no second lookup / rebinding); no HTTP proxy; size and time limits; body must look like VCALENDAR | `httpapi/calendar.go`, `safehttp` |
+| Push subscription SSRF | Subscribe requires https + public host (same rules as calendar); Web Push HTTP client dials only public IPs and ignores proxies | `httpapi/reminders.go`, `push`, `safehttp` |
 | CGNAT / shared public IP exhausting auth budgets | Rate-limit keys `ip`+`ja4`, not IP alone; no spoofable `X-Dayrule-Client` exemption | `docs/firewall.md`, PLAN decision 36 |
 | Cron endpoints called by others | Bearer `CRON_SECRET`, compared in constant time | `httpapi/sync.go`, `httpapi/reminders.go` |
 
