@@ -95,7 +95,8 @@ record types and timestamps, is inside the ciphertext.
 |---|---|---|
 | Storage abuse | Quotas: 50 MB, 100,000 records, 64 KB per record | `store/records.go` |
 | Sign-up spam | Email verification; Firewall rate limits (IP+JA4); no BotID challenge (decisions 25, 36); invite gate removable via `INVITE_ONLY` | `httpapi/accounts.go`, `docs/firewall.md` |
-| Calendar URL fetch SSRF | Session-required same-origin proxy; https only; no credentials in URL; DNS resolves to public IPs only (redirects re-checked); size and time limits; body must look like VCALENDAR | `httpapi/calendar.go` |
+| Calendar URL fetch SSRF | Session-required same-origin proxy; https only; no credentials in URL; DNS must be public-only (redirects re-checked); dial pins those IPs (no second lookup / rebinding); no HTTP proxy; size and time limits; body must look like VCALENDAR | `httpapi/calendar.go`, `safehttp` |
+| Push subscription SSRF | Subscribe requires https + public host (same rules as calendar); Web Push HTTP client dials only public IPs and ignores proxies | `httpapi/reminders.go`, `push`, `safehttp` |
 | CGNAT / shared public IP exhausting auth budgets | Rate-limit keys `ip`+`ja4`, not IP alone; no spoofable `X-Dayrule-Client` exemption | `docs/firewall.md`, PLAN decision 36 |
 | Cron endpoints called by others | Bearer `CRON_SECRET`, compared in constant time | `httpapi/sync.go`, `httpapi/reminders.go` |
 

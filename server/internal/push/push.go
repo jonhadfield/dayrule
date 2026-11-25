@@ -8,9 +8,11 @@ import (
 	"io"
 	"net/http"
 	"sync"
+	"time"
 
 	webpush "github.com/SherClockHolmes/webpush-go"
 
+	"github.com/jonhadfield/dayrule/server/internal/safehttp"
 	"github.com/jonhadfield/dayrule/server/internal/store"
 )
 
@@ -28,12 +30,19 @@ type WebPush struct {
 	Client     *http.Client
 }
 
+func (p WebPush) httpClient() *http.Client {
+	if p.Client != nil {
+		return p.Client
+	}
+	return safehttp.Client(10 * time.Second)
+}
+
 func (p WebPush) Send(ctx context.Context, sub store.PushSubscription, payload []byte) (bool, error) {
 	resp, err := webpush.SendNotificationWithContext(ctx, payload, &webpush.Subscription{
 		Endpoint: sub.Endpoint,
 		Keys:     webpush.Keys{P256dh: sub.P256dh, Auth: sub.Auth},
 	}, &webpush.Options{
-		HTTPClient:      p.Client,
+		HTTPClient:      p.httpClient(),
 		Subscriber:      p.Subject,
 		VAPIDPublicKey:  p.PublicKey,
 		VAPIDPrivateKey: p.PrivateKey,
