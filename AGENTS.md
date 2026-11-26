@@ -28,7 +28,8 @@ From the repo root:
 - `pnpm dev` — Vite dev server; proxies `/api` to `localhost:8080`.
 - `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`, `pnpm format:check`.
 - `web/scripts/icons.sh` — re-renders the PWA icons in `web/public/icons/`
-  (needs `rsvg-convert`). Commit the PNGs.
+  and site favicons (`favicon.ico`, `favicon-32.png`, `favicon.svg`; needs
+  `rsvg-convert` and ImageMagick `magick`). Commit the PNGs and ICO.
 - `pnpm e2e` — Playwright end-to-end tests against the real API. Needs Go and
   `E2E_DATABASE_URL` pointing at a **throwaway** Postgres database (it is
   migrated and filled with test accounts), e.g. the local test container's
@@ -96,7 +97,7 @@ CI (`.github/workflows/ci.yml`) runs all of the above checks on every PR.
   user data.
 - No third-party scripts, analytics or trackers; the CSP in `vercel.json`
   enforces `'self'` only. The one exception is `connect-src
-  https://api.pwnedpasswords.com` for the breached-password check;
+https://api.pwnedpasswords.com` for the breached-password check;
   don’t add others.
 - Never test Firewall rate limits from the owner’s connection against
   production: a block applies to that IP for the whole site. Firewall rules
