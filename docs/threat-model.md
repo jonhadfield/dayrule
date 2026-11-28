@@ -1,9 +1,11 @@
 # Dayrule threat model
 
-Reviewed 2026-10-04 (M7). This is the full threat model for the web app and
-API. It describes what Dayrule protects, from whom, how, and what it does not
-protect against. Where a control is enforced in code or CI, the location is
-given so it can be checked.
+Reviewed 2026-11-28 (post-M7 re-review; first full write-up 2026-10-04).
+This is the full threat model for the web app and API. Native companions
+(`dayrule-apple`) and the local CLI/MCP (`server/cmd/dayrule`) use the same
+encrypted sync wire format; this document covers the web delivery path and
+shared API. Where a control is enforced in code or CI, the location is given
+so it can be checked.
 
 ## What we protect
 
@@ -14,6 +16,7 @@ given so it can be checked.
 | Password and recovery phrase | Never leave the device; the server stores Argon2id(AuthKey) and SHA-256 of a recovery proof |
 | Session | `__Host-session` cookie (HttpOnly, Secure, SameSite=Strict); server stores its SHA-256 |
 | Email address | Readable on the server (needed for codes and reminder emails) |
+| Calendar overlay (optional) | Not vault ciphertext: a local `.ics` stays on device; a fetched https feed is proxied by the API (URL + brief body), then the browser may keep URL + ICS text in `localStorage` for this device only (not synced) |
 
 ## Who we defend against
 
@@ -36,7 +39,9 @@ JavaScript (see "Residual risks").
  │ IndexedDB: ciphertext only  │          │ per deployment) + Go API  │        │ account rows │
  │ service worker              │ ◄─────── │ cron: GC, reminders       │        └──────────────┘
  └─────────────────────────────┘          └───────────────────────────┘
-                                                   │ Resend (email), Web Push services
+         │ HIBP (password check only)              │ Resend, Web Push;
+         │ optional calendar host via API          │ optional calendar host (user URL)
+ Local CLI/MCP (trusted on that machine): same API, plaintext only in process memory
 ```
 
 ## What the server can see
@@ -45,8 +50,16 @@ Account email; ciphertext sizes (padded to buckets); how many records; when
 devices sync; IP addresses and device labels for sessions; push endpoints;
 and, only if reminders are turned on, when each reminder is due. Record ids
 are keyed HMACs, so the server can't tell which records are to-dos, link
-them to local ids, or see when they were created. Everything else, including
-record types and timestamps, is inside the ciphertext.
+them to local ids, or see when they were created. Everything else about the
+vault, including record types and timestamps, is inside the ciphertext.
+
+Also (not vault ciphertext, documented in Privacy):
+
+- **Crash reports** (`POST /api/v1/errors`): short message, optional stack,
+  build id and user-agent; purged after 30 days. No to-do bodies.
+- **Calendar URL fetch** (`POST /api/v1/calendar/ics`): the https feed URL
+  and, briefly while proxying, the feed body (event titles and times). The
+  API does not store the feed; a local `.ics` file never leaves the device.
 
 ## Threats and mitigations
 
@@ -61,6 +74,7 @@ record types and timestamps, is inside the ciphertext.
 | Size analysis | Padding to buckets (256 B … 4 KiB multiples) | `crypto/primitives.ts` |
 | Harvest now, decrypt later | Only symmetric crypto protects content (256-bit keys); TLS negotiates `X25519MLKEM768` on Vercel's edge (checked) | PLAN §10.8 |
 | Lost or stolen locked device | IndexedDB holds only ciphertext; the AK is wrapped; auto-lock after 15 minutes unless "stay unlocked" is chosen | `account/Gate.tsx`, `crypto/device-store.ts` |
+| Glance at the app switcher / another tab while unlocked | Brand-only privacy cover when the tab is hidden or the page is backgrounded (decision 34); password screens stay opaque | `account/PrivacyCover.tsx` |
 
 ### Account and session
 
@@ -96,8 +110,9 @@ record types and timestamps, is inside the ciphertext.
 | Threat | Mitigation | Where |
 |---|---|---|
 | Storage abuse | Quotas: 50 MB, 100,000 records, 64 KB per record | `store/records.go` |
-| Sign-up spam | Email verification; Firewall rate limits (IP+JA4); no BotID challenge (decisions 25, 36); invite gate removable via `INVITE_ONLY` | `httpapi/accounts.go`, `docs/firewall.md` |
+| Sign-up spam | Email verification; Firewall rate limits (IP+JA4); no BotID challenge (decisions 25, 36). Signup is open (`INVITE_ONLY=false`); `INVITE_ONLY` can still require invite codes | `httpapi/accounts.go`, `docs/firewall.md` |
 | Calendar URL fetch SSRF | Session-required same-origin proxy; https only; no credentials in URL; DNS must be public-only (redirects re-checked); dial pins those IPs (no second lookup / rebinding); no HTTP proxy; size and time limits; body must look like VCALENDAR | `httpapi/calendar.go`, `safehttp` |
+| Crash-report abuse / PII in stacks | Message and stack only (clipped); no request bodies logged; 30-day purge via GC cron; owner list via `cmd/error-reports` | `httpapi/errors.go`, `app/errors.ts`, decision 10 |
 | Push subscription SSRF | Subscribe requires https + public host (same rules as calendar); Web Push HTTP client dials only public IPs and ignores proxies | `httpapi/reminders.go`, `push`, `safehttp` |
 | CGNAT / shared public IP exhausting auth budgets | Rate-limit keys `ip`+`ja4`, not IP alone; no spoofable `X-Dayrule-Client` exemption | `docs/firewall.md`, PLAN decision 36 |
 | Cron endpoints called by others | Bearer `CRON_SECRET`, compared in constant time | `httpapi/sync.go`, `httpapi/reminders.go` |
@@ -120,10 +135,26 @@ record types and timestamps, is inside the ciphertext.
   device could see stale or missing items. There is no signed record-set
   manifest; adding one is possible future work.
 - **Metadata** listed above, including reminder times when reminders are on,
-  and push endpoints.
+  push endpoints, and crash-report stacks.
+- **Calendar overlay.** Fetching a feed URL means the API (and the calendar
+  host) see the request; Dayrule briefly sees event titles and times in the
+  response body. Remembered feeds on this device sit in `localStorage` as
+  plaintext ICS, outside the vault encryption and sync model. Prefer a local
+  `.ics` file when that matters.
+- **Have I Been Pwned.** When choosing a new password, the browser sends a
+  5-character SHA-1 prefix to `api.pwnedpasswords.com` (decision 31). That
+  party sees the user's IP and the prefix, not the account. The check fails
+  open if unreachable.
 - **An unlocked device.** Anyone using an unlocked device, or the OS account
   of a device set to stay unlocked, can read everything. Browser extensions
-  with page access can too.
+  with page access can too. The privacy cover only hides content from a glance
+  at the switcher or another tab; it does not stop an attacker on the same
+  unlocked session.
+- **Local CLI / MCP.** Credentials (and optional TOTP secret) live in the
+  environment or a local creds file; decrypted titles live in that process.
+  Anyone who can read that machine's process memory or the creds file can
+  read the vault for that account. Prefer a dedicated agent account; see
+  `docs/cli-mcp.md`.
 - **Recovery is all or nothing.** Losing both the password and the recovery
   phrase loses the data; nobody can recover it.
 - **Email provider.** Resend sees the email address, sign-up and change
@@ -133,3 +164,10 @@ record types and timestamps, is inside the ciphertext.
 
 Re-review this document when the crypto, the sync protocol, the hosting, or
 anything that adds a new party (a provider, a script, an endpoint) changes.
+
+**2026-11-28:** Confirmed mitigations already in the tables for two-step
+sign-in, breached-password check, Firewall IP+JA4, recovery timing oracle,
+calendar/push SSRF, WAF desired-state CI and verify-deploy. Added server
+visibility for crash reports and calendar URL fetch; privacy cover;
+open-signup note; residual risks for calendar overlay, HIBP, and the local
+CLI/MCP. No new code gaps found that need a fix in this pass.
