@@ -227,24 +227,27 @@ async function main() {
   }
   if (!notificationSeen) console.log('notifications', [])
 
-  await page.evaluate(async ({ channel }) => {
-    const hdrs = {
-      'content-type': 'application/json',
-      'X-Dayrule-Client': 'web',
-    }
-    await fetch('/api/v1/reminders', {
-      method: 'PUT',
-      credentials: 'include',
-      headers: hdrs,
-      body: JSON.stringify({ reminders: [] }),
-    })
-    await fetch('/api/v1/reminders/settings', {
-      method: 'PUT',
-      credentials: 'include',
-      headers: hdrs,
-      body: JSON.stringify({ channel }),
-    })
-  }, { channel: prevChannel })
+  await page.evaluate(
+    async ({ channel }) => {
+      const hdrs = {
+        'content-type': 'application/json',
+        'X-Dayrule-Client': 'web',
+      }
+      await fetch('/api/v1/reminders', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: hdrs,
+        body: JSON.stringify({ reminders: [] }),
+      })
+      await fetch('/api/v1/reminders/settings', {
+        method: 'PUT',
+        credentials: 'include',
+        headers: hdrs,
+        body: JSON.stringify({ channel }),
+      })
+    },
+    { channel: prevChannel },
+  )
   console.log('restored channel to previous')
 
   await close()
