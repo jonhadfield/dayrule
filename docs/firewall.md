@@ -7,8 +7,13 @@ Desired state lives in `scripts/firewall-desired-state.json`. Check with:
 ./scripts/firewall-check.sh
 ```
 
-Requires the Vercel CLI, logged in to the `dayrule` project. The check is
+Requires the Vercel CLI. Locally: logged in to the `dayrule` project. In CI:
+repository secret `VERCEL_TOKEN` and variables `VERCEL_ORG_ID` /
+`VERCEL_PROJECT_ID` (see `.github/workflows/firewall.yml`). The check is
 **read-only** — it does not publish or probe auth endpoints.
+
+GitHub Actions runs the same script weekly (Monday 05:30 UTC), on demand, and
+on PRs that touch the Firewall desired-state files.
 
 ## Policy (PLAN decisions 25 and 36)
 

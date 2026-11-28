@@ -1,0 +1,79 @@
+name: Verify deploy
+
+# Assert dayrule.app still serves a byte-identical build of the commit it
+# reports (PLAN.md §10.7 / threat-model residual). Uses
+# `pnpm --filter web verify-deploy`.
+
+on:
+  schedule:
+    # Daily, after typical overnight deploys settle.
+    - cron: '0 6 * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-deploy-production
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: verify-deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Wait for production to report this commit (main pushes)
+        if: github.event_name == 'push'
+        env:
+          WANT: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+          want_short="${WANT:0:7}"
+          echo "Waiting for https://dayrule.app/api/health version=$want_short…"
+          for i in $(seq 1 30); do
+            body="$(curl -sS --connect-timeout 10 --max-time 30 \
+              -H 'Accept: application/json' \
+              -H 'User-Agent: dayrule-verify-deploy/1' \
+              https://dayrule.app/api/health)"
+            version="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version") or "")' <<<"$body")"
+            echo "try $i: version=$version"
+            if [[ "$WANT" == "$version"* ]] || [[ "$version" == "$want_short" ]]; then
+              echo "production is on $version"
+              exit 0
+            fi
+            sleep 20
+          done
+          echo "Timed out waiting for production to reach $want_short (last version=$version)" >&2
+          exit 1
+
+      - name: Check out the commit production reports
+        id: tip
+        run: |
+          set -euo pipefail
+          body="$(curl -sS --connect-timeout 10 --max-time 30 \
+            -H 'Accept: application/json' \
+            -H 'User-Agent: dayrule-verify-deploy/1' \
+            https://dayrule.app/api/health)"
+          version="$(python3 -c 'import json,sys; print(json.load(sys.stdin).get("version") or "")' <<<"$body")"
+          if [[ -z "$version" ]]; then
+            echo "health missing version: $body" >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          git checkout --force "$version"
+
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - name: Byte-compare live assets to this source
+        run: pnpm --filter web verify-deploy https://dayrule.app
