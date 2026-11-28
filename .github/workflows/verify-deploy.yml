@@ -16,8 +16,9 @@ permissions:
   contents: read
 
 concurrency:
-  group: verify-deploy-production
-  cancel-in-progress: true
+  # Don't cancel an in-flight main-push wait when a manual/daily run starts.
+  group: verify-deploy-production-${{ github.event_name }}
+  cancel-in-progress: false
 
 jobs:
   verify:
