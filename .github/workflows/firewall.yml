@@ -1,0 +1,46 @@
+name: Firewall desired state
+
+# Read-only check that production WAF rate limits match
+# scripts/firewall-desired-state.json (PLAN decision 36, docs/firewall.md).
+# Does not probe auth endpoints or set actionDuration.
+
+on:
+  schedule:
+    # Monday after the weekly ZAP baseline (05:00).
+    - cron: '30 5 * * 1'
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/firewall-desired-state.json
+      - scripts/firewall-check.sh
+      - .github/workflows/firewall.yml
+      - docs/firewall.md
+
+permissions:
+  contents: read
+
+concurrency:
+  group: firewall-desired-state
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: firewall-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      VERCEL_ORG_ID: ${{ vars.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ vars.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+      - name: Require VERCEL_TOKEN
+        run: |
+          if [ -z "$VERCEL_TOKEN" ]; then
+            echo "Set repository secret VERCEL_TOKEN (Vercel personal or project token)." >&2
+            exit 1
+          fi
+      - name: Install Vercel CLI
+        run: npm install -g vercel@63.1.2
+      - name: Compare live rules to desired state
+        run: ./scripts/firewall-check.sh
