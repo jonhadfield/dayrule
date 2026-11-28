@@ -4,6 +4,11 @@
 !.env.example
 *.pem
 *.key
+# Credential drops (use ~/.config/dayrule/creds for DAYRULE_CREDS)
+agent-credentials.txt
+**/agent-credentials.txt
+creds.txt
+**/creds.txt
 
 # Local plan / decisions (not published)
 PLAN.md
