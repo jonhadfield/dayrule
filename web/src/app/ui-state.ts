@@ -26,6 +26,8 @@ interface UIState {
   selecting: boolean
   /** Quick Find: null when closed, else the text to start with. */
   finding: string | null
+  /** Quick Entry modal (⌃Space → Inbox). */
+  quickEntry: boolean
   /** Desktop Settings popover / mobile Settings sheet. */
   settingsOpen: boolean
   /** A to-do to select (desktop) or open (mobile) once its list shows. */
@@ -55,6 +57,7 @@ interface UIState {
   startSelecting: (id: string) => void
   stopSelecting: () => void
   find: (query: string | null) => void
+  setQuickEntry: (open: boolean) => void
   setSettingsOpen: (open: boolean) => void
   focusAfterNavigation: (
     target: { todoId: string; path: string } | null,
@@ -77,6 +80,7 @@ export const useUI = create<UIState>((set) => ({
   panelIds: null,
   selecting: false,
   finding: null,
+  quickEntry: false,
   settingsOpen: false,
   pendingFocus: null,
   lingering: {},
@@ -147,6 +151,7 @@ export const useUI = create<UIState>((set) => ({
   stopSelecting: () =>
     set({ selecting: false, selectedIds: [], anchorId: null }),
   find: (finding) => set({ finding }),
+  setQuickEntry: (quickEntry) => set({ quickEntry }),
   setSettingsOpen: (settingsOpen) => set({ settingsOpen }),
   focusAfterNavigation: (pendingFocus) => set({ pendingFocus }),
 }))

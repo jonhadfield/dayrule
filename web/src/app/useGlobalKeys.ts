@@ -33,7 +33,7 @@ export function useGlobalKeys() {
     const onKey = (ev: KeyboardEvent) => {
       if (ev.defaultPrevented || ev.isComposing) return
       const ui = useUI.getState()
-      if (ui.panel) return // the open dialog handles its own keys
+      if (ui.panel || ui.quickEntry) return // open dialogs handle their own keys
       const typing = isTyping(ev.target)
       const printable =
         !ev.metaKey &&
@@ -43,6 +43,12 @@ export function useGlobalKeys() {
         ev.key.trim() !== ''
 
       if (ui.finding !== null) {
+        if (comboOf(ev) === 'ctrl+space') {
+          ev.preventDefault()
+          ui.find(null)
+          ui.setQuickEntry(true)
+          return
+        }
         // Keep what's typed before Quick Find's field has focus. Once it
         // has, the field takes the keys itself.
         if (!typing && printable) {
@@ -117,6 +123,11 @@ export function useGlobalKeys() {
         case 'mod+f':
         case 'mod+/':
           return run(() => ui.find(''))
+        case 'ctrl+space':
+          return run(() => {
+            ui.find(null)
+            ui.setQuickEntry(true)
+          })
         case 'enter':
           if (!ui.editingId && ui.selectedIds[0])
             run(() => ui.edit(ui.selectedIds[0]!))

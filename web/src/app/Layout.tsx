@@ -10,6 +10,7 @@ import { useGlobalKeys } from './useGlobalKeys'
 import { KeyboardPanels } from '../features/pickers/KeyboardPanels'
 import { DragLayer } from '../features/dnd/DragLayer'
 import { QuickFindHost } from '../features/find/QuickFind'
+import { QuickEntryHost } from '../features/todo/QuickEntry'
 import { MobileEditor } from '../features/todo/MobileEditor'
 import { SignInToSync } from '../account/SignInAgain'
 import { SelectionBar } from '../features/todo/SelectionBar'
@@ -127,6 +128,7 @@ export function Layout() {
           <NoticeBar />
           <KeyboardPanels />
           <QuickFindHost />
+          <QuickEntryHost />
         </div>
       </DragLayer>
     )
@@ -145,6 +147,7 @@ export function Layout() {
           </main>
           <KeyboardPanels />
           <QuickFindHost />
+          <QuickEntryHost />
           <SelectionBar />
           <NoticeBar />
         </div>
