@@ -37,10 +37,8 @@ jobs:
       - name: Require VERCEL_TOKEN
         run: |
           if [ -z "$VERCEL_TOKEN" ]; then
-            echo "Set repository secret VERCEL_TOKEN (Vercel personal or project token)." >&2
+            echo "Set repository secret VERCEL_TOKEN (project-scoped vcp_ token preferred)." >&2
             exit 1
           fi
-      - name: Install Vercel CLI
-        run: npm install -g vercel@63.1.2
       - name: Compare live rules to desired state
         run: ./scripts/firewall-check.sh
