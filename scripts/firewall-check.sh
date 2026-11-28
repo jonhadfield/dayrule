@@ -1,89 +1,81 @@
 #!/usr/bin/env bash
-# Compare live Vercel Firewall custom rate-limit rules to scripts/firewall-desired-state.json.
-# Requires: vercel CLI + python3. Locally: logged-in CLI. In CI: VERCEL_TOKEN
-# (and optional VERCEL_ORG_ID / VERCEL_PROJECT_ID, or --scope / --project).
-# Does not hammer production or change config — read-only.
+# Compare live Vercel Firewall custom rate-limit rules to
+# scripts/firewall-desired-state.json (PLAN decision 36).
+#
+# Uses the REST API (not `vercel firewall`), so project-scoped `vcp_` tokens
+# work: the CLI's "retrieve Project Settings" step fails for those tokens.
+#
+# Auth: VERCEL_TOKEN (required in CI). Locally you can export a token or rely
+# on the CLI session by leaving VERCEL_TOKEN unset and setting
+# FIREWALL_CHECK_USE_CLI=1 (legacy path).
+#
+# Project: VERCEL_PROJECT_ID (or -- defaults to dayrule's id).
+# Team: VERCEL_ORG_ID (optional for vcp_ tokens; required for full-account).
+#
+# Read-only — does not publish or probe auth endpoints.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DESIRED="$ROOT/scripts/firewall-desired-state.json"
-TMP="$(mktemp)"
-ERR="$(mktemp)"
-trap 'rm -f "$TMP" "$ERR"' EXIT
+PROJECT_ID="${VERCEL_PROJECT_ID:-prj_XVcM86lwSTWYcO9PmY92Sr2oSA2M}"
+ORG_ID="${VERCEL_ORG_ID:-${VERCEL_SCOPE:-team_AXC12tymJdKVL5rUqyer2xcR}}"
 
-cd "$ROOT"
-
-list_args=(firewall rules list --json --non-interactive)
-# Prefer explicit project so CI does not need a linked .vercel/ directory.
-if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
-  list_args+=(--project "$VERCEL_PROJECT_ID")
-elif [[ -n "${VERCEL_PROJECT:-}" ]]; then
-  list_args+=(--project "$VERCEL_PROJECT")
-else
-  list_args+=(--project dayrule)
-fi
-# Project-scoped tokens (vcp_…) infer team/project from the token. Passing
-# --scope with a team id often fails for them; only add scope for team/full
-# tokens or a logged-in CLI session.
-token="${VERCEL_TOKEN:-}"
-if [[ -n "$token" ]]; then
-  list_args+=(--token "$token")
-fi
-if [[ "${token}" != vcp_* ]]; then
-  if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
-    list_args+=(--scope "$VERCEL_ORG_ID")
-  elif [[ -n "${VERCEL_SCOPE:-}" ]]; then
-    list_args+=(--scope "$VERCEL_SCOPE")
-  elif [[ -z "$token" ]]; then
-    list_args+=(--scope jon-hadfields-projects)
-  fi
-fi
-
-if ! vercel "${list_args[@]}" >"$TMP" 2>"$ERR"; then
-  echo "firewall-check: vercel firewall rules list failed" >&2
-  cat "$ERR" >&2 || true
-  if ! grep -q '{' "$TMP" 2>/dev/null; then
-    exit 1
-  fi
-fi
-# Drop any banner lines before the JSON object.
-if ! grep -q '^{' "$TMP"; then
-  sed -n '/^{/,$p' "$TMP" >"${TMP}.json"
-  mv "${TMP}.json" "$TMP"
-fi
-if ! grep -q '{' "$TMP"; then
-  echo "firewall-check: no JSON from vercel firewall rules list" >&2
-  cat "$ERR" >&2 || true
+if [[ "${FIREWALL_CHECK_USE_CLI:-}" == "1" ]]; then
+  echo "firewall-check: FIREWALL_CHECK_USE_CLI is no longer supported; use the REST path." >&2
   exit 2
 fi
 
-python3 - "$DESIRED" "$TMP" <<'PY'
-import json, sys
+if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+  # Fall back to the logged-in CLI token without printing it.
+  AUTH_JSON="${VERCEL_AUTH_JSON:-$HOME/Library/Application Support/com.vercel.cli/auth.json}"
+  if [[ -f "$AUTH_JSON" ]]; then
+    VERCEL_TOKEN="$(python3 -c "import json,sys; print(json.load(open(sys.argv[1]))['token'])" "$AUTH_JSON")"
+    export VERCEL_TOKEN
+  fi
+fi
+if [[ -z "${VERCEL_TOKEN:-}" ]]; then
+  echo "firewall-check: set VERCEL_TOKEN (project-scoped vcp_ token preferred)." >&2
+  exit 2
+fi
 
-desired_path, live_path = sys.argv[1], sys.argv[2]
+python3 - "$DESIRED" "$PROJECT_ID" "$ORG_ID" <<'PY'
+import json, sys, urllib.error, urllib.parse, urllib.request
+
+desired_path, project_id, org_id = sys.argv[1], sys.argv[2], sys.argv[3]
+token = __import__("os").environ["VERCEL_TOKEN"]
+
 with open(desired_path) as f:
     desired = json.load(f)
-raw = open(live_path).read()
-i = raw.find("{")
-if i < 0:
-    print("firewall-check: no JSON from vercel firewall rules list", file=sys.stderr)
-    sys.exit(2)
-live = json.loads(raw[i:])
 
+def get(path: str):
+    req = urllib.request.Request(
+        "https://api.vercel.com" + path,
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(req) as r:
+            return json.load(r), None
+    except urllib.error.HTTPError as e:
+        body = e.read().decode("utf-8", "replace")
+        return None, f"HTTP {e.code} {path}: {body[:300]}"
+
+q = urllib.parse.urlencode({"projectId": project_id, "teamId": org_id})
+cfg, err = get(f"/v1/security/firewall/config?{q}")
+if err:
+    # Project tokens often omit teamId.
+    q2 = urllib.parse.urlencode({"projectId": project_id})
+    cfg, err2 = get(f"/v1/security/firewall/config?{q2}")
+    if err2:
+        print("firewall-check: failed to read firewall config", file=sys.stderr)
+        print(f"  - {err}", file=sys.stderr)
+        print(f"  - {err2}", file=sys.stderr)
+        sys.exit(2)
+
+active = cfg.get("active") or {}
+rules = active.get("rules") or []
 errors = []
 
-# Managed BotID / bot protection
-managed = {m["id"]: m for m in live.get("managed", [])}
-for mid, want in desired.get("managed", {}).items():
-    m = managed.get(mid)
-    if not m:
-        errors.append(f"managed {mid}: missing")
-        continue
-    got = (m.get("action") or "").lower()
-    if got != want.lower():
-        errors.append(f"managed {mid}: action={got!r} want {want!r}")
-
-by_id = {r["id"]: r for r in live.get("rules", [])}
+by_id = {r["id"]: r for r in rules}
 for want in desired["rules"]:
     rid = want["id"]
     r = by_id.get(rid)
@@ -101,16 +93,44 @@ for want in desired["rules"]:
             errors.append(f"{rid}: {field}={rl.get(field)!r} want {wrl.get(field)!r}")
     if rl.get("action") != wrl.get("action"):
         errors.append(f"{rid}: exceed action={rl.get('action')!r} want {wrl.get('action')!r}")
-    # No persistent duration on rate limits
     dur = (r.get("action") or {}).get("mitigate", {}).get("actionDuration")
     if dur:
         errors.append(f"{rid}: has actionDuration={dur!r} (forbidden)")
 
-# Extra custom rules not in desired state
 want_ids = {w["id"] for w in desired["rules"]}
-for rid in by_id:
+for rid, r in by_id.items():
     if rid not in want_ids:
-        errors.append(f"{rid}: live rule not in desired state ({by_id[rid].get('name')})")
+        errors.append(f"{rid}: live rule not in desired state ({r.get('name')})")
+
+# Managed bots live on the project resource (not the firewall config payload).
+managed_got = {}
+proj, perr = get(f"/v9/projects/{urllib.parse.quote(project_id)}?{urllib.parse.urlencode({'teamId': org_id})}")
+if perr:
+    proj, perr2 = get(f"/v9/projects/{urllib.parse.quote(project_id)}")
+    perr = perr if proj is None else None
+if proj is None:
+    errors.append(
+        "managed bots: cannot read project settings "
+        f"({perr or perr2}). Use a team-scoped token, or ignore if only "
+        "rate-limit rules matter."
+    )
+else:
+    sec = proj.get("security") or {}
+    mr = sec.get("managedRules") or {}
+    # Map API → desired ids (matches `vercel firewall rules list` labels).
+    managed_got["bot-protection"] = "off" if not (mr.get("bot_filter") or {}).get("active") else "on"
+    # Inactive AI bot filter ≈ allow; active without challenge ≈ log/block — we want allow.
+    managed_got["ai-bots"] = "allow" if not (mr.get("ai_bots") or {}).get("active") else "block"
+    # Dashboard "BotID Basic" with no in-app checkBotId is the desired noop.
+    # botIdEnabled true would mean a stronger mode; treat false as basic.
+    managed_got["bot-id"] = "deep" if sec.get("botIdEnabled") else "basic"
+
+    for mid, want in desired.get("managed", {}).items():
+        got = managed_got.get(mid)
+        if got is None:
+            errors.append(f"managed {mid}: missing")
+        elif got.lower() != want.lower():
+            errors.append(f"managed {mid}: action={got!r} want {want!r}")
 
 if errors:
     print("firewall-check: FAIL")
@@ -118,8 +138,8 @@ if errors:
         print(f"  - {e}")
     sys.exit(1)
 
-print("firewall-check: OK (%d custom rules, managed bot-id=%s)" % (
-    len(desired["rules"]),
-    desired["managed"].get("bot-id"),
-))
+print(
+    "firewall-check: OK (%d custom rules, managed bot-id=%s)"
+    % (len(desired["rules"]), managed_got.get("bot-id") or desired["managed"].get("bot-id"))
+)
 PY

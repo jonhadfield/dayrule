@@ -38,10 +38,11 @@ Confirm with `gh workflow run firewall.yml -R jonhadfield/dayrule --ref main`.
 Rotate by creating a new project-scoped token, updating the secret, then
 deleting the old token on the Account Tokens page.
 
-`scripts/firewall-check.sh` skips `--scope` when `VERCEL_TOKEN` starts with
-`vcp_` (project-scoped); the team is taken from the token. Keep repository
-variables `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` set — `VERCEL_PROJECT_ID` is
-still passed as `--project`.
+`scripts/firewall-check.sh` calls the Vercel REST API (firewall config +
+project settings), not `vercel firewall`, so project-scoped `vcp_` tokens
+work. Keep repository variables `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` set.
+If managed-bot checks fail with a project-read error, mint a **team-scoped**
+token for Jon Hadfield's projects instead (still narrower than Full Account).
 
 ## Policy (PLAN decisions 25 and 36)
 
