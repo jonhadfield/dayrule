@@ -80,6 +80,7 @@ func errBadRequest(msg string) apiError { return apiError{http.StatusBadRequest,
 var (
 	errUnauthorized = apiError{http.StatusUnauthorized, "unauthorized", "Sign in again."}
 	errBadLogin     = apiError{http.StatusUnauthorized, "bad_login", "That email and password don't match."}
+	errBadRecovery  = apiError{http.StatusUnauthorized, "bad_recovery", "That email and recovery phrase don't match."}
 	errLocked       = apiError{http.StatusTooManyRequests, "locked", "Too many attempts. Try again in a little while."}
 	errBadCode      = apiError{http.StatusBadRequest, "bad_code", "That code isn't right."}
 	errExpiredCode  = apiError{http.StatusBadRequest, "expired_code", "That code has expired. Ask for a new one."}
@@ -602,15 +603,18 @@ func (a *Accounts) checkRecovery(ctx context.Context, emailAddr, proofB64 string
 	if err != nil {
 		return nil, err
 	}
+	got := proofHash(proof)
 	u, err := a.Store.UserByEmail(ctx, addr)
 	if errors.Is(err, store.ErrNotFound) {
-		return nil, apiError{http.StatusUnauthorized, "bad_recovery", "That email and recovery phrase don't match."}
+		// Same hash work as a wrong proof so timing doesn't reveal registration.
+		_ = auth.Equal(got, make([]byte, len(got)))
+		return nil, errBadRecovery
 	}
 	if err != nil {
 		return nil, err
 	}
-	if !auth.Equal(proofHash(proof), u.RecoveryProofHash) {
-		return nil, apiError{http.StatusUnauthorized, "bad_recovery", "That email and recovery phrase don't match."}
+	if !auth.Equal(got, u.RecoveryProofHash) {
+		return nil, errBadRecovery
 	}
 	return u, nil
 }

@@ -351,10 +351,15 @@ func TestRecoveryAndPasswordChange(t *testing.T) {
 	other := &client{hs: hs}
 	other.do("POST", "/api/v1/auth/login", map[string]string{"email": a.email, "authKey": a.authKey})
 
-	// Wrong proof fails; right proof returns the recovery wrap.
+	// Wrong proof and unknown email fail the same way (no enumeration).
 	c := &client{hs: hs}
-	if r := c.do("POST", "/api/v1/auth/recover/start", map[string]string{"email": a.email, "recoveryProof": rnd(32)}); r.code != 401 {
-		t.Fatalf("wrong proof = %d", r.code)
+	wrong := c.do("POST", "/api/v1/auth/recover/start", map[string]string{"email": a.email, "recoveryProof": rnd(32)})
+	nobody := c.do("POST", "/api/v1/auth/recover/start", map[string]string{"email": "nobody@example.com", "recoveryProof": rnd(32)})
+	if wrong.code != 401 || wrong.body["code"] != "bad_recovery" {
+		t.Fatalf("wrong proof = %d %v", wrong.code, wrong.body)
+	}
+	if nobody.code != wrong.code || nobody.body["code"] != wrong.body["code"] || nobody.body["error"] != wrong.body["error"] {
+		t.Fatalf("unknown vs wrong proof differ: %v / %v", nobody.body, wrong.body)
 	}
 	if r := c.do("POST", "/api/v1/auth/recover/start", map[string]string{"email": a.email, "recoveryProof": a.proof}); r.code != 200 || r.body["wrappedRecovery"] == nil {
 		t.Fatalf("recover/start = %d %v", r.code, r.body)
