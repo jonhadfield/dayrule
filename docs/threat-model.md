@@ -88,6 +88,8 @@ record types and timestamps, is inside the ciphertext.
 | Tampered static files | SRI on every script and stylesheet tag; the crypto worker is fetched with an integrity check before it starts (its hash is in the SRI-checked bundle); immutable Vercel deployments; reproducible builds with a published build hash and `pnpm verify-deploy` | `web/vite.config.ts`, `web/build/`, `.github/workflows/release.yml` |
 | Clickjacking | `frame-ancestors 'none'` | `vercel.json` |
 | Vulnerable dependencies | Lockfile; `pnpm audit --prod` and `govulncheck` in CI | `.github/workflows/ci.yml` |
+| Live WAF drift | Weekly (and on demand) compare of production Firewall rules to `scripts/firewall-desired-state.json` | `.github/workflows/firewall.yml`, `scripts/firewall-check.sh` |
+| Live static assets swapped | Daily / after `main` pushes: rebuild the commit `/api/health` reports and byte-compare every file to dayrule.app | `.github/workflows/verify-deploy.yml`, `web/build/verify-deploy.mjs` |
 
 ### Availability and abuse
 

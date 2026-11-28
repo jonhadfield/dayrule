@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Compare live Vercel Firewall custom rate-limit rules to scripts/firewall-desired-state.json.
-# Requires: vercel CLI logged in to the dayrule project; python3.
+# Requires: vercel CLI + python3. Locally: logged-in CLI. In CI: VERCEL_TOKEN
+# (and optional VERCEL_ORG_ID / VERCEL_PROJECT_ID, or --scope / --project).
 # Does not hammer production or change config — read-only.
 set -euo pipefail
 
@@ -10,9 +11,30 @@ TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
 
 cd "$ROOT"
-vercel firewall rules list --json >"$TMP" 2>/dev/null || {
+
+list_args=(firewall rules list --json --non-interactive)
+# Prefer explicit project so CI does not need a linked .vercel/ directory.
+if [[ -n "${VERCEL_PROJECT_ID:-}" ]]; then
+  list_args+=(--project "$VERCEL_PROJECT_ID")
+elif [[ -n "${VERCEL_PROJECT:-}" ]]; then
+  list_args+=(--project "$VERCEL_PROJECT")
+else
+  list_args+=(--project dayrule)
+fi
+if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
+  list_args+=(--scope "$VERCEL_ORG_ID")
+elif [[ -n "${VERCEL_SCOPE:-}" ]]; then
+  list_args+=(--scope "$VERCEL_SCOPE")
+else
+  list_args+=(--scope jon-hadfields-projects)
+fi
+if [[ -n "${VERCEL_TOKEN:-}" ]]; then
+  list_args+=(--token "$VERCEL_TOKEN")
+fi
+
+vercel "${list_args[@]}" >"$TMP" 2>/dev/null || {
   # CLI sometimes prints a banner before JSON
-  vercel firewall rules list --json 2>&1 | sed -n '/^{/,$p' >"$TMP"
+  vercel "${list_args[@]}" 2>&1 | sed -n '/^{/,$p' >"$TMP"
 }
 
 python3 - "$DESIRED" "$TMP" <<'PY'
