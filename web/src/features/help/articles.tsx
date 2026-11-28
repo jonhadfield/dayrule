@@ -524,6 +524,12 @@ function Devices() {
         When there’s a new version of Dayrule, a message offers <K>Reload</K>.
         Nothing changes until you choose it.
       </P>
+      <H2>Quick capture</H2>
+      <P>
+        Inside Dayrule on a computer, <K>⌃Space</K> (Control+Space) opens Quick
+        Entry and files a new to-do into the Inbox without leaving the list
+        you’re on. Enter adds it and keeps the box ready for the next one.
+      </P>
       <H2>Bookmarklet</H2>
       <P>
         On a computer, Account → Your data → <K>Copy bookmarklet</K> puts a
@@ -717,6 +723,12 @@ function Shortcuts() {
         or <K>⌘</K>/<K>Ctrl</K> to select several. Right-click for more. After
         Complete or Move to Trash, an Undo bar appears for a few seconds. Press{' '}
         <K>?</K> in Dayrule to see these any time.
+      </P>
+      <P>
+        <K>⌃Space</K> (Control+Space) opens <strong>Quick Entry</strong>: type a
+        title, press Enter, and it goes straight to the Inbox. The box stays
+        open so you can add another; Escape closes it. (On a Mac this is
+        Control, not ⌘ — ⌘Space is reserved by the system.)
       </P>
       {[...groups].map(([group, list]) => (
         <section key={group}>
