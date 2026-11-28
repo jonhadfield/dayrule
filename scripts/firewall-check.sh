@@ -8,7 +8,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 DESIRED="$ROOT/scripts/firewall-desired-state.json"
 TMP="$(mktemp)"
-trap 'rm -f "$TMP"' EXIT
+ERR="$(mktemp)"
+trap 'rm -f "$TMP" "$ERR"' EXIT
 
 cd "$ROOT"
 
@@ -21,21 +22,40 @@ elif [[ -n "${VERCEL_PROJECT:-}" ]]; then
 else
   list_args+=(--project dayrule)
 fi
-if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
-  list_args+=(--scope "$VERCEL_ORG_ID")
-elif [[ -n "${VERCEL_SCOPE:-}" ]]; then
-  list_args+=(--scope "$VERCEL_SCOPE")
-else
-  list_args+=(--scope jon-hadfields-projects)
+# Project-scoped tokens (vcp_…) infer team/project from the token. Passing
+# --scope with a team id often fails for them; only add scope for team/full
+# tokens or a logged-in CLI session.
+token="${VERCEL_TOKEN:-}"
+if [[ -n "$token" ]]; then
+  list_args+=(--token "$token")
 fi
-if [[ -n "${VERCEL_TOKEN:-}" ]]; then
-  list_args+=(--token "$VERCEL_TOKEN")
+if [[ "${token}" != vcp_* ]]; then
+  if [[ -n "${VERCEL_ORG_ID:-}" ]]; then
+    list_args+=(--scope "$VERCEL_ORG_ID")
+  elif [[ -n "${VERCEL_SCOPE:-}" ]]; then
+    list_args+=(--scope "$VERCEL_SCOPE")
+  elif [[ -z "$token" ]]; then
+    list_args+=(--scope jon-hadfields-projects)
+  fi
 fi
 
-vercel "${list_args[@]}" >"$TMP" 2>/dev/null || {
-  # CLI sometimes prints a banner before JSON
-  vercel "${list_args[@]}" 2>&1 | sed -n '/^{/,$p' >"$TMP"
-}
+if ! vercel "${list_args[@]}" >"$TMP" 2>"$ERR"; then
+  echo "firewall-check: vercel firewall rules list failed" >&2
+  cat "$ERR" >&2 || true
+  if ! grep -q '{' "$TMP" 2>/dev/null; then
+    exit 1
+  fi
+fi
+# Drop any banner lines before the JSON object.
+if ! grep -q '^{' "$TMP"; then
+  sed -n '/^{/,$p' "$TMP" >"${TMP}.json"
+  mv "${TMP}.json" "$TMP"
+fi
+if ! grep -q '{' "$TMP"; then
+  echo "firewall-check: no JSON from vercel firewall rules list" >&2
+  cat "$ERR" >&2 || true
+  exit 2
+fi
 
 python3 - "$DESIRED" "$TMP" <<'PY'
 import json, sys

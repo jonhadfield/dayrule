@@ -15,6 +15,34 @@ repository secret `VERCEL_TOKEN` and variables `VERCEL_ORG_ID` /
 GitHub Actions runs the same script weekly (Monday 05:30 UTC), on demand, and
 on PRs that touch the Firewall desired-state files.
 
+### CI token (least privilege)
+
+A `vercel login` / “Sign in with Vercel” session **cannot** mint tokens
+(`Cannot create tokens for this app`). Create a **project-scoped** access
+token in the dashboard instead:
+
+1. Open [Account Tokens](https://vercel.com/account/tokens) while viewing your
+   **personal** account (not a team) in the scope switcher.
+2. Name it e.g. `dayrule-github-firewall`.
+3. **Scope:** team **Jon Hadfield's projects** → project **dayrule** (not
+   “All Projects” — that would be team-wide).
+4. Pick an expiry; Create; copy the value once (prefix `vcp_`).
+5. Store it as the GitHub Actions secret (never commit it):
+
+```bash
+gh secret set VERCEL_TOKEN -R jonhadfield/dayrule
+# paste the token, Enter, Ctrl-D
+```
+
+Confirm with `gh workflow run firewall.yml -R jonhadfield/dayrule --ref main`.
+Rotate by creating a new project-scoped token, updating the secret, then
+deleting the old token on the Account Tokens page.
+
+`scripts/firewall-check.sh` skips `--scope` when `VERCEL_TOKEN` starts with
+`vcp_` (project-scoped); the team is taken from the token. Keep repository
+variables `VERCEL_ORG_ID` / `VERCEL_PROJECT_ID` set — `VERCEL_PROJECT_ID` is
+still passed as `--project`.
+
 ## Policy (PLAN decisions 25 and 36)
 
 | Layer | Policy |
