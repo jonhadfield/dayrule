@@ -96,6 +96,12 @@ export const BINDINGS: Binding[] = [
     group: 'Navigate',
     whileTyping: true,
   },
+  {
+    keys: 'ctrl+space',
+    description: 'Quick Entry (Inbox)',
+    group: 'Create',
+    whileTyping: true,
+  },
 ]
 
 const isMac =
@@ -104,6 +110,7 @@ const isMac =
 /**
  * Normalise a key event to "alt+mod+shift+key". Letters use `code`, so
  * Option+N reads as "alt+n" on a Mac (where `key` would be "˜").
+ * Control+Space is always "ctrl+space" (⌃, not ⌘) on every platform.
  */
 export function comboOf(e: KeyboardEvent): string {
   let key: string
@@ -111,8 +118,20 @@ export function comboOf(e: KeyboardEvent): string {
   else if (/^Digit\d$/.test(e.code)) key = e.code.slice(5)
   else if (e.key === 'ArrowUp') key = 'up'
   else if (e.key === 'ArrowDown') key = 'down'
+  else if (e.key === ' ' || e.code === 'Space') key = 'space'
   else if (e.key === '?') return '?'
   else key = e.key.toLowerCase()
+
+  // ⌃Space: bind Control explicitly so Mac ⌘Space stays free for the OS.
+  if (key === 'space' && e.ctrlKey) {
+    const parts: string[] = []
+    if (e.altKey) parts.push('alt')
+    if (e.metaKey) parts.push('mod')
+    parts.push('ctrl')
+    if (e.shiftKey) parts.push('shift')
+    parts.push('space')
+    return parts.join('+')
+  }
 
   const parts: string[] = []
   if (e.altKey) parts.push('alt')
@@ -138,6 +157,8 @@ export function displayKeys(keys: string): string {
           if (k === 'enter') return '↵'
           if (k === 'escape') return 'Esc'
           if (k === 'backspace') return isMac ? '⌫' : 'Backspace'
+          if (k === 'space') return 'Space'
+          if (k === 'ctrl') return isMac ? '⌃' : 'Ctrl+'
           return k.length === 1 ? k.toUpperCase() : k
         })
         .join(''),

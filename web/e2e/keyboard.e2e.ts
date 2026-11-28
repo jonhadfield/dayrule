@@ -51,6 +51,18 @@ test('core actions by keyboard only', async ({ page }) => {
   await page.keyboard.press('Enter')
   await expect(page.locator('li[data-selected]')).toHaveText(/Water the plants/)
 
+  // ⌃Space Quick Entry files into Inbox without leaving Today.
+  await page.keyboard.press('Control+Space')
+  await expect(page.getByRole('dialog', { name: 'Quick Entry' })).toBeVisible()
+  await page.keyboard.type('From Quick Entry')
+  await page.keyboard.press('Enter')
+  await expect(page.getByRole('dialog', { name: 'Quick Entry' })).toBeVisible()
+  await page.keyboard.press('Escape')
+  await page.keyboard.press('g')
+  await page.keyboard.press('i')
+  await expect(page).toHaveURL(/\/inbox$/)
+  await expect(rows).toContainText('From Quick Entry')
+
   // ? shows the shortcuts.
   await page.keyboard.press('?')
   await expect(

@@ -19,6 +19,12 @@ describe('comboOf', () => {
     expect(comboOf(ev({ key: 'Escape', code: 'Escape' }))).toBe('escape')
     expect(comboOf(ev({ key: '?', code: 'Slash', shiftKey: true }))).toBe('?')
   })
+
+  it('maps Control+Space to ctrl+space on every platform', () => {
+    expect(comboOf(ev({ key: ' ', code: 'Space', ctrlKey: true }))).toBe(
+      'ctrl+space',
+    )
+  })
 })
 
 describe('bindings', () => {
@@ -29,7 +35,7 @@ describe('bindings', () => {
 
   it('only allows modifier combos (or Esc) while typing', () => {
     for (const b of BINDINGS.filter((x) => x.whileTyping)) {
-      expect(b.keys === 'escape' || /(mod|alt)\+/.test(b.keys)).toBe(true)
+      expect(b.keys === 'escape' || /(mod|alt|ctrl)\+/.test(b.keys)).toBe(true)
     }
   })
 })
